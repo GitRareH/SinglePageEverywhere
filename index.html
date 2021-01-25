@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
   <title>标题测试</title>
   <style type="text/css">
     .green {
@@ -21,10 +21,19 @@
 
 <body>
   <h1 class="green">HTML教程1</h1>
-  <p>这是<a href="./p1.html">第一个段落</a>段落测试段落<br/>测试段落测试段落测试段落测试段落测试段落测试</p>
+  <p>这是<a href="./p1.html">第一个段落</a>段落测试段落<br />测试段落测试段落测试段落测试段落测试段落测试</p>
   <p>这是<a href="./p2.html">第二个段落</a></p>
-  
-  <img src="./TEMP.JPG"/>
+
+  <img src="./TEMP.JPG" />
+
+  <script>
+    fetch('./README.md')
+      .then((response) => {
+        response.text().then((text) => {
+          console.log(text)
+        })
+      })
+  </script>
 </body>
 
 </html>

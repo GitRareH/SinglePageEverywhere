@@ -1,0 +1,307 @@
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style type="text/css">
+    .RubiksCube {
+      height: 5cm;
+      width: 5cm;
+      perspective: 30cm;
+      perspective-origin: 200% -100%;
+      transform-style: preserve-3d;
+    }
+
+    .RubiksCubePiece {
+      position: absolute;
+      transform-style: preserve-3d;
+    }
+
+    .RubiksCubeFace {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      border: 1mm solid black;
+      border-radius: 2mm;
+      background-color: black;
+    }
+
+    .RubiksCubeFace_F {
+      background-color: red;
+    }
+
+    .RubiksCubeFace_B {
+      background-color: orangered;
+    }
+
+    .RubiksCubeFace_U {
+      background-color: blue;
+    }
+
+    .RubiksCubeFace_D {
+      background-color: green;
+    }
+
+    .RubiksCubeFace_L {
+      background-color: white;
+    }
+
+    .RubiksCubeFace_R {
+      background-color: yellow;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="RubiksCubeContainer" style="user-select: none; position: relative; top: 20%; left: 20%;">
+  </div>
+
+  <script type="text/javascript">
+    'use strict'
+    /**
+     * 通知发送人
+     * @class
+     */
+    class Notifier {
+      constructor() {
+        this.listeners = []
+      }
+      addListener(listener) {
+        this.listeners.push(listener)
+      }
+      removeListener(listener) {
+        const i = this.listeners.indexOf(listener)
+        if (i >= 0) {
+          for (let j = i; j + 1 < this.listeners.length; j++)
+            this.listeners[j] = this.listeners[j + 1]
+          this.listeners.pop()
+        }
+      }
+      notify(message) {
+        for (const listener of this.listeners) {
+          listener(message)
+        }
+      }
+    }
+    /**
+     * 魔方
+     * @class
+     */
+    class RubiksCube {
+      /**
+       * 每个面对面的面
+       */
+      static oppositeFace = {
+        F: 'B', B: 'F',
+        U: 'D', D: 'U',
+        L: 'R', R: 'L',
+      }
+      /**
+       * 坐标轴与面的关系
+       */
+      static axisFace = {
+        x: { '-1': 'L', '1': 'R' },
+        y: { '-1': 'U', '1': 'D' },
+        z: { '-1': 'B', '1': 'F' },
+      }
+      // 建立左手系，魔方一角为原点，紧贴坐标轴放置于第一象限
+      constructor(n) {
+        this.n = n
+        this.pieceBulk = []
+        this.twistNotifier = new Notifier()
+        const pieceBulk = this.pieceBulk
+        class RubiksCubePiece {
+          constructor(px, py, pz, x, y, z) {
+            this.pCount = [px, py, pz].reduce((c, v) => { return c + (v === undefined ? 0 : 1) }, 0)
+              ;[this.px, this.py, this.pz] = [px, py, pz]
+              ;[this.x, this.y, this.z] = [x, y, z]
+          }
+        }
+        // 绕圈
+        for (let y = 1; y < n - 1; y++) {
+          pieceBulk.push(new RubiksCubePiece('L', undefined, 'B', 0, y, 0))
+          pieceBulk.push(new RubiksCubePiece('L', undefined, 'F', 0, y, n - 1))
+          pieceBulk.push(new RubiksCubePiece('R', undefined, 'F', n - 1, y, n - 1))
+          pieceBulk.push(new RubiksCubePiece('R', undefined, 'B', n - 1, y, 0))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece('L', undefined, undefined, 0, y, i))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece(undefined, undefined, 'F', i, y, n - 1))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece('R', undefined, undefined, n - 1, y, i))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece(undefined, undefined, 'B', i, y, 0))
+        }
+        // 上下面
+        for (let y = 0; y < n; y += n - 1) {
+          const p = y === 0 ? 'U' : 'D'
+          pieceBulk.push(new RubiksCubePiece('L', p, 'B', 0, y, 0))
+          pieceBulk.push(new RubiksCubePiece('L', p, 'F', 0, y, n - 1))
+          pieceBulk.push(new RubiksCubePiece('R', p, 'F', n - 1, y, n - 1))
+          pieceBulk.push(new RubiksCubePiece('R', p, 'B', n - 1, y, 0))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece('L', p, undefined, 0, y, i))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece(undefined, p, 'F', i, y, n - 1))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece('R', p, undefined, n - 1, y, i))
+          for (let i = 1; i < n - 1; i++)
+            pieceBulk.push(new RubiksCubePiece(undefined, p, 'B', i, y, 0))
+          for (let x = 1; x < n - 1; x++)
+            for (let z = 1; z < n - 1; z++)
+              pieceBulk.push(new RubiksCubePiece(undefined, p, undefined, x, y, z))
+        }
+      }
+      /** 
+       * 获取魔方某一层的方块
+       * @param {String} axis 坐标轴名称（x, y, z)
+       * @param {Number} n 层数（从 0 开始）
+       */
+      *layer(axis, n) {
+        if (axis !== this.lastAccessAxis) {
+          this.lastAccessAxis = axis
+          this.layerCache = Array.from({ length: this.n }, () => [])
+          for (const piece of this.pieceBulk)
+            this.layerCache[piece[axis]].push(piece)
+        }
+        yield* this.layerCache[n]
+      }
+      /**
+       * 将魔方一层旋转 90 度
+       * @param {String} axis 坐标轴名称（x, y, z)
+       * @param {Number} n 层数（从 0 开始）
+       * @param {Boolean} clockwise 顺时针/逆时针（从坐标轴正方向看）
+       */
+      twist(axis, n, clockwise) {
+        if (this.twisting) return
+        this.twisting = true
+        const pieces = []
+        const [a, b] = {
+          x: ['y', 'z'],
+          y: ['z', 'x'],
+          z: ['x', 'y'],
+        }[axis]
+        const v = this.n - 1
+        for (const piece of this.layer(axis, n)) {
+          ;[piece[a], piece[b]] = clockwise ? [v - piece[b], piece[a]] : [piece[b], v - piece[a]]
+            ;[piece[`p${a}`], piece[`p${b}`]] = [piece[`p${b}`], piece[`p${a}`]]
+          pieces.push(piece)
+        }
+        this.twistNotifier.notify({ pieces, axis, clockwise })
+      }
+      /**
+       * 绘制于某个 div 中
+       * @param {HTMLDivElement} div
+       */
+      drawOn(div) {
+        this.size = 5 // cm
+        const ui = document.createElement('div')
+        ui.classList.add('RubiksCube')
+        const style = ((id) => {
+          let style = document.getElementById(id)
+          if (style === null) {
+            style = document.createElement('style')
+            style.id = id
+            document.head.appendChild(style)
+          }
+          return style
+        })('RubiksCubePieceSize')
+        style.innerHTML =
+          `.RubiksCubePiece {
+        top: ${50 - 100 / this.n / 2}%;
+        left: ${50 - 100 / this.n / 2}%;
+        width: ${100 / this.n}%;
+        height: ${100 / this.n}%;
+      }
+      .RubiksCubeFace_y_n { transform: rotateX(90deg) translateZ(${this.size / this.n / 2}cm); }
+      .RubiksCubeFace_y_p { transform: rotateX(-90deg) translateZ(${this.size / this.n / 2}cm); }
+      .RubiksCubeFace_x_n { transform: rotateY(-90deg) translateZ(${this.size / this.n / 2}cm); }
+      .RubiksCubeFace_x_p { transform: rotateY(90deg) translateZ(${this.size / this.n / 2}cm); }
+      .RubiksCubeFace_z_p { transform: rotateX(0deg) translateZ(${this.size / this.n / 2}cm); }
+      .RubiksCubeFace_z_n { transform: rotateX(180deg) translateZ(${this.size / this.n / 2}cm); }
+
+      /*.RubiksCubeFace_y_n_m { transform: rotateX(90deg) translateZ(${this.size / 3}cm); }*/
+      .RubiksCubeFace_y_p_m { transform: rotateX(-90deg) translateZ(${this.size / 3}cm); }
+      .RubiksCubeFace_x_n_m { transform: rotateY(-90deg) translateZ(${this.size / 3}cm); }
+      /*.RubiksCubeFace_x_p_m { transform: rotateY(90deg) translateZ(${this.size / 3}cm); }*/
+      /*.RubiksCubeFace_z_p_m { transform: rotateX(0deg) translateZ(${this.size / 3}cm); }*/
+      .RubiksCubeFace_z_n_m { transform: rotateX(180deg) translateZ(${this.size * 2}cm); }`
+        const offset = (this.n - 1) / 2
+        for (const piece of this.pieceBulk) {
+          const pDiv = document.createElement('div')
+          pDiv.classList.add('RubiksCubePiece')
+          for (let i = 0; i < 6 + piece.pCount; i++) {
+            const faceDiv = document.createElement('div')
+            pDiv.appendChild(faceDiv)
+          }
+          ui.appendChild(pDiv)
+          piece.setUI = () => {
+            const [x, y, z] = [piece.x, piece.y, piece.z].map((v) => v - offset)
+            pDiv.style.transformOrigin = `${50 - 100 * x}% ${50 - 100 * y}% ${-this.size / this.n * z}cm`
+            pDiv.style.transform = `translate3d(${100 * x}%, ${100 * y}%, ${this.size / this.n * z}cm)`
+            const faceIterator = pDiv.children[Symbol.iterator]()
+            for (const axis of ['x', 'y', 'z']) {
+              const face = piece[`p${axis}`]
+              if (piece[axis] === 0) {
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p`
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n RubiksCubeFace_${face}`
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n_m RubiksCubeFace_${face}`
+              } else if (piece[axis] === this.n - 1) {
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p RubiksCubeFace_${face}`
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p_m RubiksCubeFace_${face}`
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n`
+              } else {
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p`
+                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n`
+              }
+            }
+          }
+          piece.setUI()
+          piece.ui = pDiv
+        }
+        div.appendChild(ui)
+        // 设计动画，动画播放完才视为动作完成
+        const twistListener = ({ pieces, axis, clockwise }) => {
+          const totalTime = 250 // ms
+          const frames = 15
+          const rotateFunc = `rotate${axis.toUpperCase()}`
+          const rotateSign = `${clockwise ? '+' : '-'}`
+          const animation = setInterval((state) => {
+            state.angle += state.angleStep
+            if (state.angle < 90) {
+              for (const transform of state.transformList)
+                transform.rotateTo(state.angle)
+            } else {
+              for (const transform of state.transformList)
+                transform.endRotate()
+              clearInterval(animation)
+              this.twisting = false
+            }
+          }, totalTime / frames, {
+            angle: 0,
+            angleStep: Math.ceil(90 / frames),
+            transformList: pieces.map((piece) => {
+              const style = piece.ui.style
+              const baseText = `${style.transform}`
+              return {
+                rotateTo: (angle) => style.transform = `${baseText} ${rotateFunc}(${rotateSign}${angle}deg)`,
+                endRotate: piece.setUI,
+              }
+            })
+          })
+        }
+        this.twistNotifier.addListener(twistListener)
+      }
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    let rc = new RubiksCube(3)
+    window.onload = () => {
+      rc.drawOn(document.getElementById('RubiksCubeContainer'))
+    }
+  </script>
+</body>
+
+
+</html>

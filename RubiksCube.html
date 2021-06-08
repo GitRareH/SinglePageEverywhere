@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <style type="text/css">
     .RubiksCube {
-      height: 5cm;
-      width: 5cm;
-      perspective: 30cm;
+      height: 6cm;
+      width: 6cm;
+      perspective: 36cm;
       perspective-origin: 200% -100%;
       transform-style: preserve-3d;
     }
@@ -53,7 +53,17 @@
 </head>
 
 <body>
-  <div id="RubiksCubeContainer" style="user-select: none; position: relative; top: 20%; left: 20%;">
+  <div>
+    <h1>操作说明</h1>
+    <h2>重置/生成 n 阶魔方</h2>
+    <p>234567</p>
+    <h2>拧魔方</h2>
+    <p>x 轴各层 qwertyu</p>
+    <p>y 轴各层 asdfghj</p>
+    <p>z 轴各层 zxcvbnm</p>
+    <p>大写字母为逆时针</p>
+  </div>
+  <div id="RubiksCubeContainer" style="user-select: none; position: absolute; top: 20%; left: 30%;">
   </div>
 
   <script type="text/javascript">
@@ -109,6 +119,7 @@
         this.n = n
         this.pieceBulk = []
         this.twistNotifier = new Notifier()
+        this.twistEndNotifier = new Notifier()
         const pieceBulk = this.pieceBulk
         class RubiksCubePiece {
           constructor(px, py, pz, x, y, z) {
@@ -167,6 +178,33 @@
         yield* this.layerCache[n]
       }
       /**
+       * 标识是否正在进行拧的操作
+       */
+      get twisting() { return this.hasOwnProperty('_twisting') ? this._twisting : false }
+      set twisting(value) {
+        const oldValue = this._twisting
+        this._twisting = value
+        if (oldValue === true && value === false)
+          this.twistEndNotifier.notify()
+      }
+      /**
+       * 稍候将魔方一层旋转 90 度
+       */
+      twistLater(axis, n, clockwise) {
+        if (this.hasOwnProperty('_twistList') === false) {
+          this._twistList = []
+          this.twistEndNotifier.addListener(() => {
+            if (this._twistList.length === 0) return
+            const [_axis, _n, _clockwise] = this._twistList.shift()
+            this.twist(_axis, _n, _clockwise)
+          })
+        }
+        if (this.twisting)
+          this._twistList.push([axis, n, clockwise])
+        else
+          this.twist(axis, n, clockwise)
+      }
+      /**
        * 将魔方一层旋转 90 度
        * @param {String} axis 坐标轴名称（x, y, z)
        * @param {Number} n 层数（从 0 开始）
@@ -194,7 +232,8 @@
        * @param {HTMLDivElement} div
        */
       drawOn(div) {
-        this.size = 5 // cm
+        this.size = 6 // 魔方大小 cm
+        // TODO: css3d 中涉及 z 轴的变幻只能指定长度，不能指定百分比
         const ui = document.createElement('div')
         ui.classList.add('RubiksCube')
         const style = ((id) => {
@@ -230,7 +269,7 @@
         for (const piece of this.pieceBulk) {
           const pDiv = document.createElement('div')
           pDiv.classList.add('RubiksCubePiece')
-          for (let i = 0; i < 6 + piece.pCount; i++) {
+          for (let i = 0; i < 6; i++) {
             const faceDiv = document.createElement('div')
             pDiv.appendChild(faceDiv)
           }
@@ -245,10 +284,8 @@
               if (piece[axis] === 0) {
                 faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p`
                 faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n RubiksCubeFace_${face}`
-                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n_m RubiksCubeFace_${face}`
               } else if (piece[axis] === this.n - 1) {
                 faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p RubiksCubeFace_${face}`
-                faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p_m RubiksCubeFace_${face}`
                 faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n`
               } else {
                 faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_p`
@@ -262,8 +299,8 @@
         div.appendChild(ui)
         // 设计动画，动画播放完才视为动作完成
         const twistListener = ({ pieces, axis, clockwise }) => {
-          const totalTime = 250 // ms
-          const frames = 15
+          const totalTime = 200 // 旋转动画播放总时长 ms
+          const frames = 12 // 动画总帧数
           const rotateFunc = `rotate${axis.toUpperCase()}`
           const rotateSign = `${clockwise ? '+' : '-'}`
           const animation = setInterval((state) => {
@@ -296,9 +333,38 @@
   </script>
   <script type="text/javascript">
     'use strict'
-    let rc = new RubiksCube(3)
     window.onload = () => {
-      rc.drawOn(document.getElementById('RubiksCubeContainer'))
+      let rc = null // 魔方（目前样式表命名规律不允许多个魔方）
+      const keyMap = {} // 设计按键绑定
+      '234567'.split('').forEach((k, i) => {
+        const n = parseInt(k)
+        keyMap[k] = () => {
+          rc = new RubiksCube(n)
+          const div = document.getElementById('RubiksCubeContainer')
+          div.innerHTML = ''
+          rc.drawOn(div)
+          for (const oldKey of Object.keys(keyMap)) {
+            if (isNaN(parseInt(oldKey)))
+              delete keyMap[oldKey]
+          }
+          'qwertyu'.substr(0, n).split('').forEach((k, i) => {
+            keyMap[k] = () => { rc.twistLater('x', i, true) }
+            keyMap[k.toUpperCase()] = () => { rc.twistLater('x', i, false) }
+          })
+          'asdfghj'.substr(0, n).split('').forEach((k, i) => {
+            keyMap[k] = () => { rc.twistLater('y', i, true) }
+            keyMap[k.toUpperCase()] = () => { rc.twistLater('y', i, false) }
+          })
+          'zxcvbnm'.substr(0, n).split('').forEach((k, i) => {
+            keyMap[k] = () => { rc.twistLater('z', i, true) }
+            keyMap[k.toUpperCase()] = () => { rc.twistLater('z', i, false) }
+          })
+        }
+      })
+      document.body.onkeypress = (ev) => {
+        if (keyMap.hasOwnProperty(ev.key) === false) return
+        keyMap[ev.key]()
+      }
     }
   </script>
 </body>

@@ -6,8 +6,9 @@
     .RubiksCube {
       height: 6cm;
       width: 6cm;
-      perspective: 36cm;
-      perspective-origin: 200% -100%;
+      perspective: 30cm;
+      perspective-origin: 250% -200%;
+      /* transform: rotateX(-20deg) rotateY(-25deg); */
       transform-style: preserve-3d;
     }
 
@@ -31,7 +32,7 @@
     }
 
     .RubiksCubeFace_B {
-      background-color: orangered;
+      background-color: orange;
     }
 
     .RubiksCubeFace_U {
@@ -49,6 +50,19 @@
     .RubiksCubeFace_R {
       background-color: yellow;
     }
+
+    kbd {
+      color: #666;
+      display: inline-block;
+      padding: 2px 5px;
+      background: #f1f1f1;
+      text-transform: capitalize;
+      text-align: center;
+      border-radius: 4px;
+      border: 2px solid #e4e4e4;
+      box-shadow: inset 0 0 20px white, 0 5px 0 #b1b1b1, 0 6px 0 1px #7e7e7e, 0 8px 5px #a5a5a5;
+      margin: 0px 5px;
+    }
   </style>
 </head>
 
@@ -56,12 +70,14 @@
   <div>
     <h1>操作说明</h1>
     <h2>重置/生成 n 阶魔方</h2>
-    <p>234567</p>
+    <p><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd></p>
     <h2>拧魔方</h2>
-    <p>x 轴各层 qwertyu</p>
-    <p>y 轴各层 asdfghj</p>
-    <p>z 轴各层 zxcvbnm</p>
-    <p>大写字母为逆时针</p>
+    <p>x 轴各层 <kbd>q</kbd><kbd>w</kbd><kbd>e</kbd><kbd>r</kbd><kbd>t</kbd><kbd>y</kbd><kbd>u</kbd></p>
+    <p>y 轴各层 <kbd>a</kbd><kbd>s</kbd><kbd>d</kbd><kbd>f</kbd><kbd>g</kbd><kbd>h</kbd><kbd>j</kbd></p>
+    <p>z 轴各层 <kbd>z</kbd><kbd>x</kbd><kbd>c</kbd><kbd>v</kbd><kbd>b</kbd><kbd>n</kbd><kbd>m</kbd></p>
+    <p>按住<kbd>shift</kbd>为反方向</p>
+    <h2>观察被遮挡的面</h2>
+    <p><kbd>space</kbd></p>
   </div>
   <div id="RubiksCubeContainer" style="user-select: none; position: absolute; top: 20%; left: 30%;">
   </div>
@@ -292,6 +308,11 @@
                 faceIterator.next().value.className = `RubiksCubeFace RubiksCubeFace_${axis}_n`
               }
             }
+            const transparentClass = 'RubiksCubeFaceTransparent'
+            pDiv.querySelectorAll('.RubiksCubeFace').forEach((element) => element.classList.add(transparentClass))
+            if (piece.x === 0) pDiv.querySelector('.RubiksCubeFace_x_n').classList.remove(transparentClass)
+            if (piece.y === this.n - 1) pDiv.querySelector('.RubiksCubeFace_y_p').classList.remove(transparentClass)
+            if (piece.z === 0) pDiv.querySelector('.RubiksCubeFace_z_n').classList.remove(transparentClass)
           }
           piece.setUI()
           piece.ui = pDiv
@@ -344,7 +365,7 @@
           div.innerHTML = ''
           rc.drawOn(div)
           for (const oldKey of Object.keys(keyMap)) {
-            if (isNaN(parseInt(oldKey)))
+            if (oldKey.toUpperCase() !== oldKey.toLowerCase())
               delete keyMap[oldKey]
           }
           'qwertyu'.substr(0, n).split('').forEach((k, i) => {
@@ -364,6 +385,13 @@
       document.body.onkeypress = (ev) => {
         if (keyMap.hasOwnProperty(ev.key) === false) return
         keyMap[ev.key]()
+      }
+      // 观察被遮挡的面
+      {
+        const style = document.createElement('style')
+        style.innerHTML = '.RubiksCubeFaceTransparent { border: none; background-color: rgba(0, 0, 0, 0.1); }'
+        document.body.onkeydown = (ev) => { if (ev.key === ' ') document.head.appendChild(style) }
+        document.body.onkeyup = (ev) => { if (ev.key === ' ') document.head.removeChild(style) }
       }
     }
   </script>

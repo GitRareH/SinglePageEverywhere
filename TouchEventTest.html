@@ -1,0 +1,81 @@
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style type="text/css">
+    #outputArea {
+      position: absolute;
+      width: 100%;
+      height: 90%;
+      background-color: darkseagreen;
+    }
+
+    #testArea {
+      position: absolute;
+      width: 100%;
+      height: 90%;
+    }
+
+    p {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div>
+    <div>
+      <label>缓冲区大小</label>
+      <input id="maxLinesInput" type="number" step="1" min="1" max="1000000" value="100" />
+      <input type="button" value="清空缓冲区" onclick="outputArea.clear()" />
+      <div onclick="
+      const checkbox = event.currentTarget.firstElementChild
+      if (event.target !== checkbox)
+       checkbox.checked = !checkbox.checked
+      testArea.hidden= !checkbox.checked">
+        <input type="checkbox" checked />
+        <label>记录触摸事件</label>
+      </div>
+    </div>
+    <div>
+      <div id="outputArea"></div>
+      <div id="testArea"></div>
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    'use strict'
+
+    const maxLinesInput = document.getElementById('maxLinesInput')
+    const outputArea = {
+      ui: document.getElementById('outputArea'),
+      get maxLines() { return maxLinesInput.value },
+      set maxLines(value) { maxLinesInput.value = value },
+      writeLine(text) {
+        if (this.ui.childElementCount >= this.maxLines)
+          this.ui.removeChild(this.ui.firstChild)
+        const p = document.createElement('p')
+        p.innerText = text
+        this.ui.appendChild(p)
+      },
+      clear() {
+        this.ui.innerHTML = ''
+      }
+    }
+
+    const testArea = document.getElementById('testArea')
+    for (const eventName of ['touchstart',
+      'touchend',
+      'touchmove',
+      'touchcancel',]) {
+      testArea.addEventListener(eventName, (ev) => {
+        outputArea.writeLine(eventName + Array.from(ev.touches).reduce(
+          (message, touch) => `${message} (${touch.clientX}, ${touch.clientY}, ${touch.force})`,
+          ''))
+      })
+    }
+  </script>
+</body>
+
+</html>

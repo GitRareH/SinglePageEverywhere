@@ -1,0 +1,266 @@
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style type="text/css">
+    .KlotskiPieceContainer {
+      position: absolute;
+      user-select: none;
+    }
+
+    .DigitalPiece {
+      width: 1.5cm;
+      height: 1.5cm;
+      border: 1mm solid black;
+      border-radius: 1mm;
+      box-sizing: border-box;
+      line-height: 1.3cm;
+      text-align: center;
+      font-size: 5mm;
+    }
+
+    kbd {
+      color: #666;
+      display: inline-block;
+      padding: 2px 5px;
+      background: #f1f1f1;
+      text-transform: capitalize;
+      text-align: center;
+      border-radius: 4px;
+      border: 2px solid #e4e4e4;
+      box-shadow: inset 0 0 20px white, 0 5px 0 #b1b1b1, 0 6px 0 1px #7e7e7e, 0 8px 5px #a5a5a5;
+      margin: 0px 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div>
+    <h3>数字华容道</h3>
+    <h4>操作说明</h4>
+    <div>
+      <input id="DigitalKlotskiN" type="number" value="4" min="2" max="6" step="1" />
+      <input type="button" value="开始" onclick="resetDigitalKlotski(document.getElementById('DigitalKlotskiN').value)" />
+    </div>
+    <div id="DigitalKlotskiContainer" style="margin: 5mm;">
+    </div>
+  </div>
+
+  <div>
+    <h3>经典华容道</h3>
+    <h4>操作说明</h4>
+    <div>
+      <input type="button" value="开始" />
+    </div>
+    <div id="ClassicalKlotskiContainer" style="margin-top: 5mm; margin-left: 5mm;">
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    'use strict'
+    /**
+     * 通知发送人
+     * @class
+     */
+    class Notifier {
+      constructor() {
+        this.listeners = []
+      }
+      addListener(listener) {
+        this.listeners.push(listener)
+      }
+      removeListener(listener) {
+        const i = this.listeners.indexOf(listener)
+        if (i >= 0) {
+          for (let j = i; j + 1 < this.listeners.length; j++)
+            this.listeners[j] = this.listeners[j + 1]
+          this.listeners.pop()
+        }
+      }
+      notify(message) {
+        for (const listener of this.listeners) {
+          listener(message)
+        }
+      }
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    class Orientation {
+      static get up() { return 'U' }
+      static get down() { return 'D' }
+      static get left() { return 'L' }
+      static get right() { return 'R' }
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    /**
+     * 华容道
+     */
+    class Klotski {
+      /**
+       * @param {String[][]} data 描述华容道的二维数组，值相等的元素位于同一块，null 为空白
+       */
+      constructor(data) {
+        class KlotskiPiece {
+          constructor(name) {
+            this.name = name
+            this.points = []
+            this.beginMoveNotifier = new Notifier()
+            this.endMoveNotifier = new Notifier()
+          }
+          addPoint(x, y) { this.points.push({ x: x, y: y }) }
+          get origin() { return this.points[0] }
+          *[Symbol.iterator]() { yield* this.points }
+        }
+        this.data = data.map((rowData) => rowData.map((name) => name)) // 华容道数据
+        this.pieceDictionary = data.reduce((dictionary, rowData, y) => {
+          rowData.forEach((name, x) => {
+            if (name === null) return
+            if (dictionary[name] === undefined)
+              dictionary[name] = new KlotskiPiece(name)
+            dictionary[name].addPoint(x, y)
+          })
+          return dictionary
+        }, {})// 使用名称检索方块
+      }
+      /** 
+       * 检查此方块是否允许移动
+       * @param {String} name 方块名称
+       * @param {Orientation} Orientation 移动方向
+       * @return {Boolean} 此方块是否允许移动
+       */
+      canMove(name, orientation) {
+        this.movePiece = this.pieceDictionary[name]
+        switch (orientation) {
+          case Orientation.up:
+            this.checkFunc = (x, y) => y - 1 >= 0 && this.data[y - 1][x] === null
+            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y - 1][x]] = [null, this.data[y][x]]; point.y -= 1 }
+            break
+          case Orientation.down:
+            this.checkFunc = (x, y) => y + 1 < this.data.length && this.data[y + 1][x] === null
+            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y + 1][x]] = [null, this.data[y][x]]; point.y += 1 }
+            break
+          case Orientation.left:
+            this.checkFunc = (x, y) => x - 1 >= 0 && this.data[y][x - 1] === null
+            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y][x - 1]] = [null, this.data[y][x]]; point.x -= 1 }
+            break
+          case Orientation.right:
+            this.checkFunc = (x, y) => x + 1 < this.data[y].length && this.data[y][x + 1] === null
+            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y][x + 1]] = [null, this.data[y][x]]; point.x += 1 }
+            break
+        }
+        for (const point of this.movePiece)
+          if (this.checkFunc(point.x, point.y) === false) return false
+        return true
+      }
+      /** 
+       * 执行移动（必须先调用 canMove）
+       */
+      move() {
+        this.movePiece.beginMoveNotifier.notify()
+        for (const point of this.movePiece)
+          this.moveFunc(point.x, point.y, point)
+        this.movePiece.endMoveNotifier.notify()
+      }
+      /**
+       * 绘制于某个 div 中
+       * @param {HTMLDivElement} div
+       */
+      drawOn(div, getPieceElement) {
+        const animationQueue = {
+          list: [],
+          totalTime: 200, // 旋转动画播放总时长 ms
+          frames: 12, // 动画总帧数
+          frameValue: function (a, b, progress) {
+            return a + (b - a) * progress
+          },
+          enQueue: function (animation) {
+            this.list.push(animation)
+            if (this.list.length === 1)
+              this.deQueue()
+          },
+          deQueue: function () {
+            let n = 1
+            const currentInterval = setInterval((animation) => {
+              const [x, y] = [
+                this.frameValue(animation.start.x, animation.end.x, n / this.frames),
+                this.frameValue(animation.start.y, animation.end.y, n / this.frames),
+              ]
+              animation.ui.style.transform = `translate(${100 * x}%, ${100 * y}%)`
+              if (n >= this.frames) {
+                clearInterval(currentInterval)
+                this.list.shift()
+                if (this.list.length > 0) this.deQueue()
+              }
+              n += 1
+            }, this.totalTime / this.frames, this.list[0])
+          }
+        }
+        for (const key in this.pieceDictionary) {
+          const piece = this.pieceDictionary[key]
+          const ui = document.createElement('div')
+          ui.appendChild(getPieceElement(piece.name))
+          ui.className = 'KlotskiPieceContainer'
+          ui.style.transform = `translate(${100 * piece.origin.x}%, ${100 * piece.origin.y}%)`
+          div.appendChild(ui)
+          let start = null
+          let end = null
+          piece.beginMoveNotifier.addListener(() => start = { ...piece.origin })
+          piece.endMoveNotifier.addListener(() => end = { ...piece.origin })
+          piece.endMoveNotifier.addListener(() => animationQueue.enQueue({ ui, start, end }))
+        }
+      }
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+
+    let digitalKlotski = null
+    const digitalKlotskiContainer = document.getElementById('DigitalKlotskiContainer')
+    function resetDigitalKlotski(n) {
+      const data = Array.from({ length: n }, (v, k) => {
+        const base = k * n
+        return Array.from({ length: n }, (v, k) => base + k + 1)
+      })
+      data[n - 1][n - 1] = null
+      digitalKlotski = new Klotski(data)
+      digitalKlotskiContainer.innerHTML = ''
+      digitalKlotski.drawOn(digitalKlotskiContainer, (name) => {
+        const div = document.createElement('div')
+        div.className = 'DigitalPiece'
+        div.innerHTML = name
+        return div
+      })
+      digitalKlotskiContainer.style.height =
+        digitalKlotskiContainer.firstElementChild.clientHeight * n
+      digitalKlotskiContainer.style.width =
+        digitalKlotskiContainer.firstElementChild.clientWidth * n
+    }
+
+    let classicalKlotski = null
+    const classicalKlotskiContainer = document.getElementById('ClassicalKlotskiContainer')
+    function resetClassicalKlotski() {
+      // 几种布局
+      // https://zhidao.baidu.com/question/553058365.html
+      classicalKlotski = new Klotski([
+        ['张飞', '曹操', '曹操', '赵云',],
+        ['张飞', '曹操', '曹操', '赵云',],
+        ['黄忠', '关羽', '关羽', '马超',],
+        ['黄忠', '卒2', '卒3', '马超',],
+        ['卒1', null, null, '卒4',],
+      ])
+      classicalKlotski.drawOn(classicalKlotskiContainer,
+        (name) => { })
+      classicalKlotskiContainer.style.height =
+        classicalKlotskiContainer.firstElementChild.clientWidth * 5
+      classicalKlotskiContainer.style.width =
+        classicalKlotskiContainer.firstElementChild.clientWidth * 4
+    }
+  </script>
+</body>
+
+
+</html>

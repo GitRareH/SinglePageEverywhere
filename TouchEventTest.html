@@ -25,11 +25,11 @@
 <body>
 
   <div>
-    <div>
+    <div style="font-size: large;">
       <label>缓冲区大小</label>
       <input id="maxLinesInput" type="number" step="1" min="1" max="1000000" value="100" />
       <input type="button" value="清空缓冲区" onclick="outputArea.clear()" />
-      <div onclick="
+      <div style="margin: 0; width: fit-content;" onclick="
       const checkbox = event.currentTarget.firstElementChild
       if (event.target !== checkbox)
        checkbox.checked = !checkbox.checked
@@ -71,8 +71,9 @@
       'touchcancel',]) {
       testArea.addEventListener(eventName, (ev) => {
         outputArea.writeLine(eventName + Array.from(ev.touches).reduce(
-          (message, touch) => `${message} (${touch.clientX}, ${touch.clientY}, ${touch.force})`,
+          (message, touch) => `${message} ${touch.identifier}(${Math.round(touch.clientX)}, ${Math.round(touch.clientY)}, ${touch.force.toFixed(2)})`,
           ''))
+        ev.preventDefault()
       })
     }
   </script>

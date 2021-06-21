@@ -3,20 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <style type="text/css">
+    .KlotskiContainer {
+      margin-top: 5px;
+    }
+
     .KlotskiPieceContainer {
       position: absolute;
       user-select: none;
+      width: 1.5cm;
+      height: 1.5cm;
     }
 
     .DigitalPiece {
-      width: 1.5cm;
-      height: 1.5cm;
+      width: 100%;
+      height: 100%;
       border: 1mm solid black;
       border-radius: 1mm;
       box-sizing: border-box;
-      line-height: 1.3cm;
+      line-height: 2;
       text-align: center;
-      font-size: 5mm;
+      font-size: 6.5mm;
+    }
+
+    .ClassicalPiece {
+      border: 1mm solid black;
+      border-radius: 1mm;
+      box-sizing: border-box;
+      padding: 5%;
+      line-height: 2;
+      text-align: center;
+      font-size: 6.5mm;
+    }
+
+    table {
+      border-collapse: collapse;
+      float: inline-start;
+      margin: 5px;
+    }
+
+    td {
+      display: table-cell;
+      padding: 5px;
+      border: 1px solid black;
+      text-align: center;
     }
 
     kbd {
@@ -43,7 +72,7 @@
       <input id="DigitalKlotskiN" type="number" value="4" min="2" max="6" step="1" />
       <input type="button" value="开始" onclick="resetDigitalKlotski(document.getElementById('DigitalKlotskiN').value)" />
     </div>
-    <div id="DigitalKlotskiContainer" style="margin: 5mm;">
+    <div id="DigitalKlotskiContainer" class="KlotskiContainer">
     </div>
   </div>
 
@@ -51,9 +80,17 @@
     <h3>经典华容道</h3>
     <h4>操作说明</h4>
     <div>
-      <input type="button" value="开始" />
+      <table id="ClassicalSetTable"> </table>
+      <input type="button" value="重新布局" onclick="document
+      .getElementById('ClassicalSetTable')
+      .querySelectorAll('input')
+      .forEach((inputElement) => {
+        inputElement.value = ''
+        inputElement.dispatchEvent(new Event('change'))
+      })" />
+      <input type="button" value="开始" onclick="resetClassicalKlotski()" />
     </div>
-    <div id="ClassicalKlotskiContainer" style="margin-top: 5mm; margin-left: 5mm;">
+    <div id="ClassicalKlotskiContainer" class="KlotskiContainer">
     </div>
   </div>
 
@@ -220,6 +257,17 @@
 
     let digitalKlotski = null
     const digitalKlotskiContainer = document.getElementById('DigitalKlotskiContainer')
+    const digitalPieceDictionary = {
+      item(n) {
+        if (this[n] === undefined) {
+          const div = document.createElement('div')
+          div.className = 'DigitalPiece'
+          div.innerHTML = n
+          this[n] = div
+        }
+        return this[n]
+      }
+    }
     function resetDigitalKlotski(n) {
       const data = Array.from({ length: n }, (v, k) => {
         const base = k * n
@@ -228,12 +276,7 @@
       data[n - 1][n - 1] = null
       digitalKlotski = new Klotski(data)
       digitalKlotskiContainer.innerHTML = ''
-      digitalKlotski.drawOn(digitalKlotskiContainer, (name) => {
-        const div = document.createElement('div')
-        div.className = 'DigitalPiece'
-        div.innerHTML = name
-        return div
-      })
+      digitalKlotski.drawOn(digitalKlotskiContainer, (name) => digitalPieceDictionary.item(name))
       digitalKlotskiContainer.style.height =
         digitalKlotskiContainer.firstElementChild.clientHeight * n
       digitalKlotskiContainer.style.width =
@@ -242,25 +285,98 @@
 
     let classicalKlotski = null
     const classicalKlotskiContainer = document.getElementById('ClassicalKlotskiContainer')
+    const createClassicalPiece = (width, height, name) => {
+      const div = document.createElement('div')
+      div.className = `ClassicalPiece ClassicalPiece_${name}`
+      div.style.width = `${100 * width}%`
+      div.style.height = `${100 * height}%`
+      div.innerHTML = name
+      return div
+    }
+    const classicalPieceDictionary = {
+      '曹操': createClassicalPiece(2, 2, '曹操'),
+      '关羽': createClassicalPiece(2, 1, '关羽'),
+      '黄忠': createClassicalPiece(1, 2, '黄忠'),
+      '马超': createClassicalPiece(1, 2, '马超'),
+      '张飞': createClassicalPiece(1, 2, '张飞'),
+      '赵云': createClassicalPiece(1, 2, '赵云'),
+      '卒1': createClassicalPiece(1, 1, '卒'),
+      '卒2': createClassicalPiece(1, 1, '卒'),
+      '卒3': createClassicalPiece(1, 1, '卒'),
+      '卒4': createClassicalPiece(1, 1, '卒'),
+    }
+    const classicalData = [
+      ['张飞', '曹操', '曹操', '赵云',],
+      ['张飞', '曹操', '曹操', '赵云',],
+      ['黄忠', '关羽', '关羽', '马超',],
+      ['黄忠', '卒2', '卒3', '马超',],
+      ['卒1', null, null, '卒4',],
+    ]
+    {
+      const table = document.getElementById('ClassicalSetTable')
+      const datalist = document.createElement('datalist')
+      datalist.id = `datalist${Date.now()}`
+      for (const [optionText, totalCount] of Array
+        .from(
+          classicalData.reduce(
+            (map, row) => row.reduce((map, k) => {
+              if (k === null) return map
+              if (map.has(k) === false) map.set(k, 0)
+              map.set(k, map.get(k) + 1)
+              return map
+            }, map), new Map())
+        ).sort(
+          (a, b) => a[1] === b[1] ? (a[0] > b[0] ? 1 : -1) : b[1] - a[1]
+        )) {
+        const option = document.createElement('option')
+        let placeCount = totalCount
+        option.value = optionText
+        option.disabled = true
+        option.inc = () => { placeCount += 1; if (placeCount >= totalCount) option.disabled = true }
+        option.dec = () => { placeCount -= 1; option.disabled = false }
+        datalist.appendChild(option)
+      }
+      table.appendChild(datalist)
+      for (let i = 0; i < 5; i++) {
+        const tr = document.createElement('tr')
+        for (let j = 0; j < 4; j++) {
+          const td = document.createElement('td')
+          const input = document.createElement('input')
+          input.setAttribute('list', datalist.id)
+          input.value = classicalData[i][j] !== null ? classicalData[i][j] : ''
+          input.style.width = '4em'
+          input.addEventListener('change', (ev) => {
+            if (classicalData[i][j] !== null) {
+              datalist.querySelector(`[value=${classicalData[i][j]}`).dec()
+              classicalData[i][j] = null
+            }
+            if (input.value.length > 0) {
+              const option = datalist.querySelector(`[value=${input.value}`)
+              if (option === null) {
+                input.value = ''
+              } else {
+                option.inc()
+                classicalData[i][j] = input.value
+              }
+            }
+            input.setAttribute('list', datalist.id)
+            // 虽然没有变化，但不再设置一次控件不会出现下拉箭头
+            // 兼容性存疑，应考虑改用 select 元素实现这一功能
+          })
+          td.appendChild(input)
+          tr.appendChild(td)
+        }
+        table.appendChild(tr)
+      }
+    }
     function resetClassicalKlotski() {
       // 几种布局
       // https://zhidao.baidu.com/question/553058365.html
-      classicalKlotski = new Klotski([
-        ['张飞', '曹操', '曹操', '赵云',],
-        ['张飞', '曹操', '曹操', '赵云',],
-        ['黄忠', '关羽', '关羽', '马超',],
-        ['黄忠', '卒2', '卒3', '马超',],
-        ['卒1', null, null, '卒4',],
-      ])
-      classicalKlotski.drawOn(classicalKlotskiContainer,
-        (name) => { })
-      classicalKlotskiContainer.style.height =
-        classicalKlotskiContainer.firstElementChild.clientWidth * 5
-      classicalKlotskiContainer.style.width =
-        classicalKlotskiContainer.firstElementChild.clientWidth * 4
+      classicalKlotski = new Klotski(classicalData)
+      classicalKlotskiContainer.innerHTML = ''
+      classicalKlotski.drawOn(classicalKlotskiContainer, (name) => classicalPieceDictionary[name])
     }
   </script>
 </body>
-
 
 </html>

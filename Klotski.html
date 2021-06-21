@@ -29,7 +29,6 @@
       border: 1mm solid black;
       border-radius: 1mm;
       box-sizing: border-box;
-      padding: 5%;
       line-height: 2;
       text-align: center;
       font-size: 6.5mm;
@@ -142,8 +141,7 @@
        */
       constructor(data) {
         class KlotskiPiece {
-          constructor(name) {
-            this.name = name
+          constructor() {
             this.points = []
             this.beginMoveNotifier = new Notifier()
             this.endMoveNotifier = new Notifier()
@@ -152,12 +150,12 @@
           get origin() { return this.points[0] }
           *[Symbol.iterator]() { yield* this.points }
         }
-        this.data = data.map((rowData) => rowData.map((name) => name)) // 华容道数据
+        this.data = data // 华容道数据
         this.pieceDictionary = data.reduce((dictionary, rowData, y) => {
           rowData.forEach((name, x) => {
             if (name === null) return
             if (dictionary[name] === undefined)
-              dictionary[name] = new KlotskiPiece(name)
+              dictionary[name] = new KlotskiPiece()
             dictionary[name].addPoint(x, y)
           })
           return dictionary
@@ -173,20 +171,24 @@
         this.movePiece = this.pieceDictionary[name]
         switch (orientation) {
           case Orientation.up:
-            this.checkFunc = (x, y) => y - 1 >= 0 && this.data[y - 1][x] === null
-            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y - 1][x]] = [null, this.data[y][x]]; point.y -= 1 }
+            this.checkFunc = (x, y) => y - 1 >= 0 &&
+              (this.data[y - 1][x] === null || this.data[y - 1][x] === name)
+            this.moveFunc = (point) => { point.y -= 1; this.data[point.y][point.x] = name }
             break
           case Orientation.down:
-            this.checkFunc = (x, y) => y + 1 < this.data.length && this.data[y + 1][x] === null
-            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y + 1][x]] = [null, this.data[y][x]]; point.y += 1 }
+            this.checkFunc = (x, y) => y + 1 < this.data.length &&
+              (this.data[y + 1][x] === null || this.data[y + 1][x] === name)
+            this.moveFunc = (point) => { point.y += 1; this.data[point.y][point.x] = name }
             break
           case Orientation.left:
-            this.checkFunc = (x, y) => x - 1 >= 0 && this.data[y][x - 1] === null
-            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y][x - 1]] = [null, this.data[y][x]]; point.x -= 1 }
+            this.checkFunc = (x, y) => x - 1 >= 0 &&
+              (this.data[y][x - 1] === null || this.data[y][x - 1] === name)
+            this.moveFunc = (point) => { point.x -= 1; this.data[point.y][point.x] = name }
             break
           case Orientation.right:
-            this.checkFunc = (x, y) => x + 1 < this.data[y].length && this.data[y][x + 1] === null
-            this.moveFunc = (x, y, point) => { [this.data[y][x], this.data[y][x + 1]] = [null, this.data[y][x]]; point.x += 1 }
+            this.checkFunc = (x, y) => x + 1 < this.data[y].length &&
+              (this.data[y][x + 1] === null || this.data[y][x + 1] === name)
+            this.moveFunc = (point) => { point.x += 1; this.data[point.y][point.x] = name }
             break
         }
         for (const point of this.movePiece)
@@ -199,7 +201,9 @@
       move() {
         this.movePiece.beginMoveNotifier.notify()
         for (const point of this.movePiece)
-          this.moveFunc(point.x, point.y, point)
+          this.data[point.y][point.x] = null
+        for (const point of this.movePiece)
+          this.moveFunc(point)
         this.movePiece.endMoveNotifier.notify()
       }
       /**
@@ -236,10 +240,10 @@
             }, this.totalTime / this.frames, this.list[0])
           }
         }
-        for (const key in this.pieceDictionary) {
-          const piece = this.pieceDictionary[key]
+        for (const name in this.pieceDictionary) {
+          const piece = this.pieceDictionary[name]
           const ui = document.createElement('div')
-          ui.appendChild(getPieceElement(piece.name))
+          ui.appendChild(getPieceElement(name))
           ui.className = 'KlotskiPieceContainer'
           ui.style.transform = `translate(${100 * piece.origin.x}%, ${100 * piece.origin.y}%)`
           div.appendChild(ui)
@@ -254,15 +258,77 @@
   </script>
   <script type="text/javascript">
     'use strict'
-
+    // 操作事件处理
+    Klotski.prototype.userMove = function (name, aX, aY, bX, bY) {
+      const [xDiff, yDiff] = [bX - aX, bY - aY].map((diff) => Math.abs(diff))
+      // if (Math.max(xDiff) <= 2) return false
+      const orientation = xDiff > yDiff ?
+        (bX > aX ? Orientation.right : Orientation.left) :
+        (bY > aY ? Orientation.down : Orientation.up)
+      console.log(`${name} ${orientation}`)
+      if (this.canMove(name, orientation)) {
+        this.move()
+        return true
+      } else {
+        return false
+      }
+    }
+    const pieceMousedown = (klotski, name, ev) => {
+      let [startX, startY] = [ev.clientX, ev.clientY]
+      let timeout = null
+      let lastEvent = null
+      const move = (ev) => {
+        lastEvent = ev
+        if (timeout === null)
+          timeout = setTimeout(() => {
+            const [currentX, currentY] = [lastEvent.clientX, lastEvent.clientY]
+            if (klotski.userMove(name, startX, startY, currentX, currentY))
+              [startX, startY] = [currentX, currentY]
+            timeout = null
+          }, 200)
+      }
+      const end = (ev) => {
+        document.removeEventListener('mousemove', move)
+        document.removeEventListener('mouseup', end)
+      }
+      document.addEventListener('mousemove', move)
+      document.addEventListener('mouseup', end)
+    }
+    const pieceTouchstart = (klotski, name, ev) => {
+      const [startX, startY] = [ev.touches[0].clientX, ev.touches[0].clientY]
+      let timeout = null
+      let lastEvent = null
+      const move = (ev) => {
+        lastEvent = ev
+        if (timeout === null)
+          timeout = setTimeout(() => {
+            const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
+            if (klotski.userMove(name, startX, startY, currentX, currentY))
+              [startX, startY] = [currentX, currentY]
+            timeout = null
+          }, 200)
+      }
+      const end = (ev) => {
+        document.removeEventListener('touchmove', move)
+        document.removeEventListener('touchend', end)
+        document.removeEventListener('touchcancel', end)
+      }
+      document.addEventListener('touchmove', move)
+      document.addEventListener('touchend', end)
+      document.addEventListener('touchcancel', end)
+    }
+    // 数字华容道
     let digitalKlotski = null
     const digitalKlotskiContainer = document.getElementById('DigitalKlotskiContainer')
     const digitalPieceDictionary = {
       item(n) {
         if (this[n] === undefined) {
           const div = document.createElement('div')
+          div.setAttribute('name', n)
           div.className = 'DigitalPiece'
           div.innerHTML = n
+          div.addEventListener('mousedown', (ev) => pieceMousedown(digitalKlotski, n, ev))
+          div.addEventListener('touchstart', (ev) => pieceTouchstart(digitalKlotski, n, ev))
           this[n] = div
         }
         return this[n]
@@ -282,28 +348,36 @@
       digitalKlotskiContainer.style.width =
         digitalKlotskiContainer.firstElementChild.clientWidth * n
     }
-
+    // 经典华容道
     let classicalKlotski = null
     const classicalKlotskiContainer = document.getElementById('ClassicalKlotskiContainer')
-    const createClassicalPiece = (width, height, name) => {
+    const createClassicalPiece = (width, height, displayName, name) => {
       const div = document.createElement('div')
-      div.className = `ClassicalPiece ClassicalPiece_${name}`
+      div.setAttribute('name', displayName)
+      div.className = 'ClassicalPiece'
       div.style.width = `${100 * width}%`
       div.style.height = `${100 * height}%`
-      div.innerHTML = name
+      div.innerHTML = displayName
+      div.addEventListener('mousedown', (ev) => pieceMousedown(classicalKlotski, name, ev))
+      div.addEventListener('touchstart', (ev) => pieceTouchstart(classicalKlotski, name, ev))
       return div
     }
     const classicalPieceDictionary = {
-      '曹操': createClassicalPiece(2, 2, '曹操'),
-      '关羽': createClassicalPiece(2, 1, '关羽'),
-      '黄忠': createClassicalPiece(1, 2, '黄忠'),
-      '马超': createClassicalPiece(1, 2, '马超'),
-      '张飞': createClassicalPiece(1, 2, '张飞'),
-      '赵云': createClassicalPiece(1, 2, '赵云'),
-      '卒1': createClassicalPiece(1, 1, '卒'),
-      '卒2': createClassicalPiece(1, 1, '卒'),
-      '卒3': createClassicalPiece(1, 1, '卒'),
-      '卒4': createClassicalPiece(1, 1, '卒'),
+      '曹操': createClassicalPiece(2, 2, '曹操', '曹操'),
+      '关羽_v': createClassicalPiece(1, 2, '关羽', '关羽_v'),
+      '关羽_h': createClassicalPiece(2, 1, '关羽', '关羽_h'),
+      '黄忠_v': createClassicalPiece(1, 2, '黄忠', '黄忠_v'),
+      '黄忠_h': createClassicalPiece(2, 1, '黄忠', '黄忠_h'),
+      '马超_v': createClassicalPiece(1, 2, '马超', '马超_v'),
+      '马超_h': createClassicalPiece(2, 1, '马超', '马超_h'),
+      '张飞_v': createClassicalPiece(1, 2, '张飞', '张飞_v'),
+      '张飞_h': createClassicalPiece(2, 1, '张飞', '张飞_h'),
+      '赵云_v': createClassicalPiece(1, 2, '赵云', '赵云_v'),
+      '赵云_h': createClassicalPiece(2, 1, '赵云', '赵云_h'),
+      '卒1': createClassicalPiece(1, 1, '卒', '卒1'),
+      '卒2': createClassicalPiece(1, 1, '卒', '卒2'),
+      '卒3': createClassicalPiece(1, 1, '卒', '卒3'),
+      '卒4': createClassicalPiece(1, 1, '卒', '卒4'),
     }
     const classicalData = [
       ['张飞', '曹操', '曹操', '赵云',],
@@ -312,6 +386,24 @@
       ['黄忠', '卒2', '卒3', '马超',],
       ['卒1', null, null, '卒4',],
     ]
+    function resetClassicalKlotski() {
+      // 几种布局 https://zhidao.baidu.com/question/553058365.html
+      const data = classicalData.map((rowData) => rowData.map((name) => name))
+      for (let i = 0; i < data.length; i++)
+        for (let j = 0; j < data[i].length; j++) {
+          if (/^((关羽)|(黄忠)|(马超)|(张飞)|(赵云))$/.test(data[i][j])) {
+            if (data[i][j + 1] === data[i][j]) [data[i][j + 1], data[i][j]] = [data[i][j] + '_h', data[i][j] + '_h']
+            else if (data[i + 1][j] === data[i][j]) [data[i + 1][j], data[i][j]] = [data[i][j] + '_v', data[i][j] + '_v']
+          }
+        }
+      classicalKlotski = new Klotski(data)
+      classicalKlotskiContainer.innerHTML = ''
+      classicalKlotski.drawOn(classicalKlotskiContainer, (name) => classicalPieceDictionary[name])
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    // 经典华容道布局设置代码
     {
       const table = document.getElementById('ClassicalSetTable')
       const datalist = document.createElement('datalist')
@@ -342,16 +434,17 @@
         for (let j = 0; j < 4; j++) {
           const td = document.createElement('td')
           const input = document.createElement('input')
+          input.setAttribute('name', `i${i}j${j}`)
           input.setAttribute('list', datalist.id)
           input.value = classicalData[i][j] !== null ? classicalData[i][j] : ''
           input.style.width = '4em'
           input.addEventListener('change', (ev) => {
             if (classicalData[i][j] !== null) {
-              datalist.querySelector(`[value=${classicalData[i][j]}`).dec()
+              datalist.querySelector(`option[value=${classicalData[i][j]}`).dec()
               classicalData[i][j] = null
             }
             if (input.value.length > 0) {
-              const option = datalist.querySelector(`[value=${input.value}`)
+              const option = datalist.querySelector(`option[value=${input.value}`)
               if (option === null) {
                 input.value = ''
               } else {
@@ -368,13 +461,6 @@
         }
         table.appendChild(tr)
       }
-    }
-    function resetClassicalKlotski() {
-      // 几种布局
-      // https://zhidao.baidu.com/question/553058365.html
-      classicalKlotski = new Klotski(classicalData)
-      classicalKlotskiContainer.innerHTML = ''
-      classicalKlotski.drawOn(classicalKlotskiContainer, (name) => classicalPieceDictionary[name])
     }
   </script>
 </body>

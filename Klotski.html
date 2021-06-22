@@ -347,6 +347,27 @@
         return Array.from({ length: n }, (v, k) => base + k + 1)
       })
       data[n - 1][n - 1] = null
+      {
+        // 打乱方式：null四个方向随机走（根据当前位置确定概率）
+        let [y, x] = [n - 1, n - 1]
+        const randomMove = (y, x) => {
+          const [l, r, u, d] = [x, n - 1 - x, y, n - 1 - y]
+          const sum = l + r + u + d
+          const [pl, pr, pu, pd] = [l / sum, (l + r) / sum, (l + r + u) / sum, 1]
+          do {
+            const n = Math.random()
+            if (n < pl) return [x - 1, y]
+            else if (n > pl && n < pr) return [x + 1, y]
+            else if (n > pr && n < pu) return [x, y - 1]
+            else if (n > pu && n < pd) return [x, y + 1]
+          } while (true)
+        }
+        for (let i = 0; i < n * n; i++) {
+          const [ny, nx] = randomMove(y, x)
+            ;[data[ny][nx], data[y][x]] = [data[y][x], data[ny][nx]]
+            ;[y, x] = [ny, nx]
+        }
+      }
       digitalKlotski = new Klotski(data)
       digitalKlotskiContainer.innerHTML = ''
       digitalKlotski.drawOn(digitalKlotskiContainer, (name) => digitalPieceDictionary.item(name))

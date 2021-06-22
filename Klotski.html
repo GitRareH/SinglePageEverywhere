@@ -10,28 +10,28 @@
     .KlotskiPieceContainer {
       position: absolute;
       user-select: none;
-      width: 1.5cm;
-      height: 1.5cm;
+      width: 3cm;
+      height: 3cm;
     }
 
     .DigitalPiece {
       width: 100%;
       height: 100%;
-      border: 1mm solid black;
-      border-radius: 1mm;
+      border: 2mm solid black;
+      border-radius: 2mm;
       box-sizing: border-box;
       line-height: 2;
       text-align: center;
-      font-size: 6.5mm;
+      font-size: 13mm;
     }
 
     .ClassicalPiece {
-      border: 1mm solid black;
-      border-radius: 1mm;
+      border: 2mm solid black;
+      border-radius: 2mm;
       box-sizing: border-box;
       line-height: 2;
       text-align: center;
-      font-size: 6.5mm;
+      font-size: 13mm;
     }
 
     table {
@@ -274,18 +274,22 @@
       }
     }
     const pieceMousedown = (klotski, name, ev) => {
+      if (ev.button !== 0) return
+      ev.preventDefault()
       let [startX, startY] = [ev.clientX, ev.clientY]
       let timeout = null
       let lastEvent = null
       const move = (ev) => {
+        ev.preventDefault()
         lastEvent = ev
-        if (timeout === null)
-          timeout = setTimeout(() => {
-            const [currentX, currentY] = [lastEvent.clientX, lastEvent.clientY]
-            if (klotski.userMove(name, startX, startY, currentX, currentY))
-              [startX, startY] = [currentX, currentY]
-            timeout = null
-          }, 200)
+        if (timeout !== null)
+          clearTimeout(timeout)
+        timeout = setTimeout(() => {
+          const [currentX, currentY] = [lastEvent.clientX, lastEvent.clientY]
+          if (klotski.userMove(name, startX, startY, currentX, currentY))
+            [startX, startY] = [currentX, currentY]
+          timeout = null
+        }, 50)
       }
       const end = (ev) => {
         document.removeEventListener('mousemove', move)
@@ -295,18 +299,21 @@
       document.addEventListener('mouseup', end)
     }
     const pieceTouchstart = (klotski, name, ev) => {
+      ev.preventDefault()
       const [startX, startY] = [ev.touches[0].clientX, ev.touches[0].clientY]
       let timeout = null
       let lastEvent = null
       const move = (ev) => {
+        ev.preventDefault()
         lastEvent = ev
-        if (timeout === null)
-          timeout = setTimeout(() => {
-            const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
-            if (klotski.userMove(name, startX, startY, currentX, currentY))
-              [startX, startY] = [currentX, currentY]
-            timeout = null
-          }, 200)
+        if (timeout !== null)
+          clearTimeout(timeout)
+        timeout = setTimeout(() => {
+          const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
+          if (klotski.userMove(name, startX, startY, currentX, currentY))
+            [startX, startY] = [currentX, currentY]
+          timeout = null
+        }, 50)
       }
       const end = (ev) => {
         document.removeEventListener('touchmove', move)
@@ -389,13 +396,26 @@
     function resetClassicalKlotski() {
       // 几种布局 https://zhidao.baidu.com/question/553058365.html
       const data = classicalData.map((rowData) => rowData.map((name) => name))
-      for (let i = 0; i < data.length; i++)
-        for (let j = 0; j < data[i].length; j++) {
-          if (/^((关羽)|(黄忠)|(马超)|(张飞)|(赵云))$/.test(data[i][j])) {
-            if (data[i][j + 1] === data[i][j]) [data[i][j + 1], data[i][j]] = [data[i][j] + '_h', data[i][j] + '_h']
-            else if (data[i + 1][j] === data[i][j]) [data[i + 1][j], data[i][j]] = [data[i][j] + '_v', data[i][j] + '_v']
+      let 曹操Checked = false, nullCount = 0
+      try {
+        for (let i = 0; i < data.length; i++)
+          for (let j = 0; j < data[i].length; j++) {
+            if (/^((关羽)|(黄忠)|(马超)|(张飞)|(赵云))$/.test(data[i][j])) {
+              if (data[i][j + 1] === data[i][j]) [data[i][j + 1], data[i][j]] = [data[i][j] + '_h', data[i][j] + '_h']
+              else if (data[i + 1][j] === data[i][j]) [data[i + 1][j], data[i][j]] = [data[i][j] + '_v', data[i][j] + '_v']
+              else throw new Error()
+            } else if (data[i][j] === '曹操' && !曹操Checked) {
+              if (data[i + 1][j] === data[i][j] && data[i][j + 1] === data[i][j] && data[i + 1][j + 1] === data[i][j])
+                曹操Checked = true
+              else throw new Error()
+            } else if (data[i][j] === null) {
+              if (nullCount > 2) throw new Error()
+              else nullCount += 1
+            }
           }
-        }
+      } catch {
+        alert('无效布局')
+      }
       classicalKlotski = new Klotski(data)
       classicalKlotskiContainer.innerHTML = ''
       classicalKlotski.drawOn(classicalKlotskiContainer, (name) => classicalPieceDictionary[name])

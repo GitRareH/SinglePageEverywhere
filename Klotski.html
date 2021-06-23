@@ -259,11 +259,9 @@
     // 操作事件处理
     const pieceMousedown = (klotski, name, ev) => {
       if (ev.button !== 0) return
-      ev.preventDefault()
       const target = ev.target
       let [startX, startY] = [ev.clientX, ev.clientY]
       const move = (ev) => {
-        ev.preventDefault()
         const [currentX, currentY] = [ev.clientX, ev.clientY]
         const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
         const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
@@ -283,11 +281,9 @@
       document.addEventListener('mouseup', end)
     }
     const pieceTouchstart = (klotski, name, ev) => {
-      ev.preventDefault()
       const target = ev.target
       let [startX, startY] = [ev.touches[0].clientX, ev.touches[0].clientY]
       const move = (ev) => {
-        ev.preventDefault()
         const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
         const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
         const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
@@ -309,8 +305,8 @@
       document.addEventListener('touchcancel', end)
     }
     document.querySelectorAll('.KlotskiContainer').forEach((element) => {
-      element.addEventListener('touchstart', (ev) => ev.preventDefault())
-      element.addEventListener('touchmove', (ev) => ev.preventDefault())
+      element.addEventListener('touchstart', (ev) => ev.preventDefault(), { passive: false })
+      element.addEventListener('touchmove', (ev) => ev.preventDefault(), { passive: false })
     })
     // 数字华容道
     let digitalKlotski = null

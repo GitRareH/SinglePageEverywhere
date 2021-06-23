@@ -257,37 +257,23 @@
   <script type="text/javascript">
     'use strict'
     // 操作事件处理
-    Klotski.prototype.userMove = function (name, aX, aY, bX, bY) {
-      const [xDiff, yDiff] = [bX - aX, bY - aY].map((diff) => Math.abs(diff))
-      // if (Math.max(xDiff) <= 2) return false
-      const orientation = xDiff > yDiff ?
-        (bX > aX ? Orientation.right : Orientation.left) :
-        (bY > aY ? Orientation.down : Orientation.up)
-      console.log(`${name} ${orientation}`)
-      if (this.canMove(name, orientation)) {
-        this.move()
-        return true
-      } else {
-        return false
-      }
-    }
     const pieceMousedown = (klotski, name, ev) => {
       if (ev.button !== 0) return
       ev.preventDefault()
+      const target = ev.target
       let [startX, startY] = [ev.clientX, ev.clientY]
-      let timeout = null
-      let lastEvent = null
       const move = (ev) => {
         ev.preventDefault()
-        lastEvent = ev
-        if (timeout !== null)
-          clearTimeout(timeout)
-        timeout = setTimeout(() => {
-          const [currentX, currentY] = [lastEvent.clientX, lastEvent.clientY]
-          if (klotski.userMove(name, startX, startY, currentX, currentY))
-            [startX, startY] = [currentX, currentY]
-          timeout = null
-        }, 50)
+        const [currentX, currentY] = [ev.clientX, ev.clientY]
+        const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
+        const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
+        if (xDiff > xMin || yDiff > yMin) {
+          if (klotski.canMove(name, xDiff > yDiff ?
+            (currentX > startX ? Orientation.right : Orientation.left) :
+            (currentY > startY ? Orientation.down : Orientation.up))) {
+            klotski.move();[startX, startY] = [currentX, currentY]
+          }
+        }
       }
       const end = (ev) => {
         document.removeEventListener('mousemove', move)
@@ -298,20 +284,20 @@
     }
     const pieceTouchstart = (klotski, name, ev) => {
       ev.preventDefault()
-      const [startX, startY] = [ev.touches[0].clientX, ev.touches[0].clientY]
-      let timeout = null
-      let lastEvent = null
+      const target = ev.target
+      let [startX, startY] = [ev.touches[0].clientX, ev.touches[0].clientY]
       const move = (ev) => {
         ev.preventDefault()
-        lastEvent = ev
-        if (timeout !== null)
-          clearTimeout(timeout)
-        timeout = setTimeout(() => {
-          const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
-          if (klotski.userMove(name, startX, startY, currentX, currentY))
-            [startX, startY] = [currentX, currentY]
-          timeout = null
-        }, 50)
+        const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
+        const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
+        const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
+        if (xDiff > xMin || yDiff > yMin) {
+          if (klotski.canMove(name, xDiff > yDiff ?
+            (currentX > startX ? Orientation.right : Orientation.left) :
+            (currentY > startY ? Orientation.down : Orientation.up))) {
+            klotski.move();[startX, startY] = [currentX, currentY]
+          }
+        }
       }
       const end = (ev) => {
         document.removeEventListener('touchmove', move)

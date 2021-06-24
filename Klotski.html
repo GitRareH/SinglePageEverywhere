@@ -126,6 +126,15 @@
       static get down() { return 'D' }
       static get left() { return 'L' }
       static get right() { return 'R' }
+      static opposite(o) {
+        switch (o) {
+          case Orientation.up: return Orientation.down
+          case Orientation.down: return Orientation.up
+          case Orientation.left: return Orientation.right
+          case Orientation.right: return Orientation.left
+          default: return o
+        }
+      }
     }
   </script>
   <script type="text/javascript">
@@ -281,10 +290,19 @@
       document.addEventListener('mouseup', end)
     }
     const pieceTouchstart = (klotski, name, ev) => {
+      if (ev.targetTouches.length > 1) return
       const target = ev.target
-      let [startX, startY] = [ev.touches[0].clientX, ev.touches[0].clientY]
+      const startTouch = ev.targetTouches[0]
+      const identifier = startTouch.identifier
+      let [startX, startY] = [startTouch.clientX, startTouch.clientY]
       const move = (ev) => {
-        const [currentX, currentY] = [ev.touches[0].clientX, ev.touches[0].clientY]
+        let touch
+        for (let i = 0; i < ev.touches.length; i++)
+          if (ev.touches[i].identifier === identifier) {
+            touch = ev.touches[i]
+            break
+          }
+        const [currentX, currentY] = [touch.clientX, touch.clientY]
         const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
         const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
         if (xDiff > xMin || yDiff > yMin) {
@@ -333,18 +351,28 @@
       data[n - 1][n - 1] = null
       {
         // data 打乱方式：null 四个方向随机走
+        // 不允许走与上一次相反的方向，否则将浪费两次打乱操作
         let [y, x] = [n - 1, n - 1]
+        let o = Orientation.left
         for (let i = 0; i < n * n; i++) {
-          let ny, nx
+          let ny, nx, no
           do {
             const random = Math.random()
-            if (random < 0.25) [ny, nx] = [y, x - 1]
-            else if (random < 0.5) [ny, nx] = [y, x + 1]
-            else if (random < 0.75) [ny, nx] = [y - 1, x]
-            else if (random < 1) [ny, nx] = [y + 1, x]
-          } while (!(nx >= 0 && nx < n && ny >= 0 && ny < n))
+            if (random < 0.25) no = Orientation.left
+            else if (random < 0.5) no = Orientation.right
+            else if (random < 0.75) no = Orientation.up
+            else if (random < 1) no = Orientation.down
+            switch (no) {
+              case Orientation.left: [ny, nx] = [y, x - 1]; break;
+              case Orientation.right: [ny, nx] = [y, x + 1]; break;
+              case Orientation.up: [ny, nx] = [y - 1, x]; break;
+              case Orientation.down: [ny, nx] = [y + 1, x]; break;
+            }
+          } while (!(nx >= 0 && nx < n &&
+            ny >= 0 && ny < n &&
+            no !== Orientation.opposite(o)))
             ;[data[ny][nx], data[y][x]] = [data[y][x], data[ny][nx]]
-            ;[y, x] = [ny, nx]
+            ;[y, x, o] = [ny, nx, no]
         }
       }
       digitalKlotski = new Klotski(data)

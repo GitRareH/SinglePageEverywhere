@@ -71,14 +71,17 @@
   <h3>数字华容道</h3>
   <div>
     <div>
-      <input type="file" accept="image/*" onchange="replaceDigitalPiece(
-        document.getElementById('DigitalKlotskiContainer'),
-        event.target.files[0])" />
       <div>
         <label>n = </label>
         <input id="DigitalKlotskiN" type="number" value="4" min="2" step="1" />
         <input type="button" value="开始" onclick="resetDigitalKlotski(
         parseInt(document.getElementById('DigitalKlotskiN').value))" />
+      </div>
+      <div>
+        <label>使用喜欢的图片：</label>
+        <input type="file" accept="image/*" onchange="replaceDigitalPiece(
+        document.getElementById('DigitalKlotskiContainer'),
+        event.target.files[0])" />
       </div>
     </div>
     <div id="DigitalKlotskiContainer" class="KlotskiContainer">
@@ -532,7 +535,11 @@
      * @param {File} file 图片文件
      */
     function replaceDigitalPiece(container, file) {
-      if (container.childElementCount <= 0) return
+      if (container.childElementCount <= 0) {
+        alert('开始后才能选择图片')
+        event.target.value = ''
+        return
+      }
       if (file === undefined) return
       createImageBitmap(file)
         .then((imageBitmap) => {

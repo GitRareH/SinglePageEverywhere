@@ -31,6 +31,11 @@
       font-size: 13mm;
     }
 
+    .ImagePiece {
+      border: 1px solid white;
+      border-radius: 0;
+    }
+
     .ClassicalPiece {
       border: 2mm solid black;
       border-radius: 2mm;
@@ -66,9 +71,15 @@
   <h3>数字华容道</h3>
   <div>
     <div>
-      <label>n = </label>
-      <input id="DigitalKlotskiN" type="number" value="4" min="2" max="6" step="1" />
-      <input type="button" value="开始" onclick="resetDigitalKlotski(document.getElementById('DigitalKlotskiN').value)" />
+      <input type="file" accept="image/*" onchange="replaceDigitalPiece(
+        document.getElementById('DigitalKlotskiContainer'),
+        event.target.files[0])" />
+      <div>
+        <label>n = </label>
+        <input id="DigitalKlotskiN" type="number" value="4" min="2" step="1" />
+        <input type="button" value="开始" onclick="resetDigitalKlotski(
+        parseInt(document.getElementById('DigitalKlotskiN').value))" />
+      </div>
     </div>
     <div id="DigitalKlotskiContainer" class="KlotskiContainer">
     </div>
@@ -334,16 +345,17 @@
         if (this[n] === undefined) {
           const div = document.createElement('div')
           div.setAttribute('name', n)
-          div.className = 'DigitalPiece'
-          div.innerHTML = n
           div.addEventListener('mousedown', (ev) => pieceMousedown(digitalKlotski, n, ev))
           div.addEventListener('touchstart', (ev) => pieceTouchstart(digitalKlotski, n, ev))
           this[n] = div
         }
+        this[n].className = 'DigitalPiece'
+        this[n].innerHTML = n
         return this[n]
       }
     }
     function resetDigitalKlotski(n) {
+      if (n < 2) { alert('无效 n 值'); return }
       const data = Array.from({ length: n }, (v, k) => {
         const base = k * n
         return Array.from({ length: n }, (v, k) => base + k + 1)
@@ -511,6 +523,41 @@
         }
         table.appendChild(tr)
       }
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    /**
+     * @param {HTMLDivElement} container 数字华容道容器
+     * @param {File} file 图片文件
+     */
+    function replaceDigitalPiece(container, file) {
+      if (container.childElementCount <= 0) return
+      if (file === undefined) return
+      createImageBitmap(file)
+        .then((imageBitmap) => {
+          const borderWidth = 1
+          const a = container.firstElementChild.offsetHeight
+          const n = Math.sqrt(container.childElementCount + 1)
+          const sa = Math.floor(Math.min(imageBitmap.width, imageBitmap.height) / n)
+          container.querySelectorAll('.DigitalPiece')
+            .forEach((pieceDiv) => {
+              const i = parseInt(pieceDiv.getAttribute('name')) - 1
+              const [x, y] = [i % n, Math.floor(i / n)].map((v) => v * sa)
+              const canvas = document.createElement('canvas')
+              canvas.height = a - borderWidth * 2
+              canvas.width = a - borderWidth * 2
+              canvas.getContext('2d').drawImage(imageBitmap,
+                x + borderWidth, y + borderWidth, sa - borderWidth * 2, sa - borderWidth * 2,
+                0, 0, canvas.width, canvas.height)
+              pieceDiv.innerHTML = ''
+              pieceDiv.appendChild(canvas)
+              pieceDiv.classList.add('ImagePiece')
+            })
+          imageBitmap.close()
+        }, (reason) => {
+          alert(`图片加载失败：${reason}`)
+        })
     }
   </script>
 </body>

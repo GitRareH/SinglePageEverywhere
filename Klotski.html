@@ -5,7 +5,7 @@
   <style type="text/css">
     .KlotskiContainer {
       margin-top: 5px;
-      background-color: silver;
+      background-color: whitesmoke;
     }
 
     #ClassicalKlotskiContainer {
@@ -29,11 +29,6 @@
       line-height: 2;
       text-align: center;
       font-size: 13mm;
-    }
-
-    .ImagePiece {
-      border: 1px solid white;
-      border-radius: 0;
     }
 
     .ClassicalPiece {
@@ -74,10 +69,12 @@
       <div>
         <label>n = </label>
         <input id="DigitalKlotskiN" type="number" value="4" min="2" step="1" />
-        <input type="button" value="开始" onclick="resetDigitalKlotski(
-        parseInt(document.getElementById('DigitalKlotskiN').value))" />
+        <input type="button" value="开始" onclick="
+        resetDigitalKlotski(parseInt(document.getElementById('DigitalKlotskiN').value))
+        document.getElementById('UsePictureDiv').hidden = false
+        replaceDigitalPiece(document.getElementById('DigitalKlotskiContainer'))" />
       </div>
-      <div>
+      <div id="UsePictureDiv" hidden>
         <label>使用喜欢的图片：</label>
         <input type="file" accept="image/*" onchange="replaceDigitalPiece(
         document.getElementById('DigitalKlotskiContainer'),
@@ -296,12 +293,10 @@
           }
         }
       }
-      const end = (ev) => {
-        document.removeEventListener('mousemove', move)
-        document.removeEventListener('mouseup', end)
-      }
       document.addEventListener('mousemove', move)
-      document.addEventListener('mouseup', end)
+      document.addEventListener('mouseup', () => {
+        document.removeEventListener('mousemove', move)
+      }, { once: true })
     }
     const pieceTouchstart = (klotski, name, ev) => {
       if (ev.targetTouches.length > 1) return
@@ -310,6 +305,9 @@
       const identifier = startTouch.identifier
       let [startX, startY] = [startTouch.clientX, startTouch.clientY]
       const move = (ev) => {
+        console.log(Array.from(ev.touches).reduce(
+          (message, touch) => `${message} (${touch.clientX}, ${touch.clientY}, ${touch.force})`,
+          ''))
         let touch
         for (let i = 0; i < ev.touches.length; i++)
           if (ev.touches[i].identifier === identifier) {
@@ -348,12 +346,12 @@
         if (this[n] === undefined) {
           const div = document.createElement('div')
           div.setAttribute('name', n)
+          div.className = 'DigitalPiece'
+          div.innerHTML = n
           div.addEventListener('mousedown', (ev) => pieceMousedown(digitalKlotski, n, ev))
           div.addEventListener('touchstart', (ev) => pieceTouchstart(digitalKlotski, n, ev))
           this[n] = div
         }
-        this[n].className = 'DigitalPiece'
-        this[n].innerHTML = n
         return this[n]
       }
     }
@@ -540,31 +538,65 @@
         event.target.value = ''
         return
       }
-      if (file === undefined) return
+      const n = Math.sqrt(container.childElementCount + 1)
+      if (file === undefined) {
+        replaceDigitalPiece.style.innerHTML = ''
+        container.querySelectorAll('.DigitalPiece')
+          .forEach((pieceDiv) => {
+            pieceDiv.innerHTML = pieceDiv.getAttribute('name')
+          })
+        digitalKlotskiContainer.style.height =
+          digitalKlotskiContainer.firstElementChild.clientHeight * n
+        digitalKlotskiContainer.style.width =
+          digitalKlotskiContainer.firstElementChild.clientWidth * n
+        return
+      }
       createImageBitmap(file)
         .then((imageBitmap) => {
           const borderWidth = 1
-          const a = container.firstElementChild.offsetHeight
-          const n = Math.sqrt(container.childElementCount + 1)
-          const sa = Math.floor(Math.min(imageBitmap.width, imageBitmap.height) / n)
+          const w = Math.floor(imageBitmap.width / n)
+          const h = Math.floor(imageBitmap.height / n)
+          if (w < 3 || h < 3) {
+            alert('图片太小了')
+            return
+          }
+          replaceDigitalPiece.style.innerHTML = `
+    .KlotskiPieceContainer {
+      width: ${w}px;
+      height: ${h}px;
+    }
+    .ImagePiece {
+      border: ${borderWidth}px solid white;
+      border-radius: 0;
+    }`
           container.querySelectorAll('.DigitalPiece')
             .forEach((pieceDiv) => {
               const i = parseInt(pieceDiv.getAttribute('name')) - 1
-              const [x, y] = [i % n, Math.floor(i / n)].map((v) => v * sa)
+              const [x, y] = [i % n * w, Math.floor(i / n) * h]
               const canvas = document.createElement('canvas')
-              canvas.height = a - borderWidth * 2
-              canvas.width = a - borderWidth * 2
+              canvas.width = w - borderWidth * 2
+              canvas.height = h - borderWidth * 2
               canvas.getContext('2d').drawImage(imageBitmap,
-                x + borderWidth, y + borderWidth, sa - borderWidth * 2, sa - borderWidth * 2,
+                x + borderWidth, y + borderWidth, w - borderWidth * 2, h - borderWidth * 2,
                 0, 0, canvas.width, canvas.height)
               pieceDiv.innerHTML = ''
               pieceDiv.appendChild(canvas)
               pieceDiv.classList.add('ImagePiece')
             })
           imageBitmap.close()
+          digitalKlotskiContainer.style.height =
+            digitalKlotskiContainer.firstElementChild.clientHeight * n
+          digitalKlotskiContainer.style.width =
+            digitalKlotskiContainer.firstElementChild.clientWidth * n
         }, (reason) => {
           alert(`图片加载失败：${reason}`)
         })
+    }
+    {
+      const style = document.createElement('style')
+      style.setAttribute('type', 'text/css')
+      document.head.appendChild(style)
+      replaceDigitalPiece.style = style
     }
   </script>
 </body>

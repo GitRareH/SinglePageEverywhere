@@ -325,7 +325,7 @@
       const end = (ev) => {
         for (let i = 0; i < ev.touches.length; i++)
           if (ev.touches[i].identifier === identifier)
-            return
+            return // 松开的不是这个手指
         document.removeEventListener('touchmove', move)
         document.removeEventListener('touchend', end)
         document.removeEventListener('touchcancel', end)
@@ -543,6 +543,7 @@
         replaceDigitalPiece.style.innerHTML = ''
         container.querySelectorAll('.DigitalPiece')
           .forEach((pieceDiv) => {
+            pieceDiv.classList.remove('ImagePiece')
             pieceDiv.innerHTML = pieceDiv.getAttribute('name')
           })
         digitalKlotskiContainer.style.height =
@@ -566,7 +567,7 @@
       height: ${h}px;
     }
     .ImagePiece {
-      border: ${borderWidth}px solid white;
+      border-width: ${borderWidth}px 0 0 ${borderWidth}px;
       border-radius: 0;
     }`
           container.querySelectorAll('.DigitalPiece')
@@ -574,10 +575,10 @@
               const i = parseInt(pieceDiv.getAttribute('name')) - 1
               const [x, y] = [i % n * w, Math.floor(i / n) * h]
               const canvas = document.createElement('canvas')
-              canvas.width = w - borderWidth * 2
-              canvas.height = h - borderWidth * 2
+              canvas.width = w - borderWidth
+              canvas.height = h - borderWidth
               canvas.getContext('2d').drawImage(imageBitmap,
-                x + borderWidth, y + borderWidth, w - borderWidth * 2, h - borderWidth * 2,
+                x + borderWidth, y + borderWidth, w - borderWidth, h - borderWidth,
                 0, 0, canvas.width, canvas.height)
               pieceDiv.innerHTML = ''
               pieceDiv.appendChild(canvas)

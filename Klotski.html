@@ -305,9 +305,6 @@
       const identifier = startTouch.identifier
       let [startX, startY] = [startTouch.clientX, startTouch.clientY]
       const move = (ev) => {
-        console.log(Array.from(ev.touches).reduce(
-          (message, touch) => `${message} (${touch.clientX}, ${touch.clientY}, ${touch.force})`,
-          ''))
         let touch
         for (let i = 0; i < ev.touches.length; i++)
           if (ev.touches[i].identifier === identifier) {
@@ -326,6 +323,9 @@
         }
       }
       const end = (ev) => {
+        for (let i = 0; i < ev.touches.length; i++)
+          if (ev.touches[i].identifier === identifier)
+            return
         document.removeEventListener('touchmove', move)
         document.removeEventListener('touchend', end)
         document.removeEventListener('touchcancel', end)
@@ -561,7 +561,7 @@
             return
           }
           replaceDigitalPiece.style.innerHTML = `
-    .KlotskiPieceContainer {
+    #DigitalKlotskiContainer .KlotskiPieceContainer {
       width: ${w}px;
       height: ${h}px;
     }

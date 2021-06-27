@@ -279,14 +279,15 @@
     // 操作事件处理
     const pieceMousedown = (klotski, name, ev) => {
       if (ev.button !== 0) return
-      const target = ev.target
       let [startX, startY] = [ev.clientX, ev.clientY]
+      const [xMin, yMin] = [ev.target.offsetWidth, ev.target.offsetHeight]
+        .map((v) => v / 2)
       const move = (ev) => {
         const [currentX, currentY] = [ev.clientX, ev.clientY]
-        const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
-        const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
+        const [xDiff, yDiff] = [currentX - startX, currentY - startY]
+          .map((diff) => Math.abs(diff))
         if (xDiff > xMin || yDiff > yMin) {
-          if (klotski.canMove(name, xDiff > yDiff ?
+          if (klotski.canMove(name, xDiff - xMin > yDiff - yMin ?
             (currentX > startX ? Orientation.right : Orientation.left) :
             (currentY > startY ? Orientation.down : Orientation.up))) {
             klotski.move();[startX, startY] = [currentX, currentY]
@@ -294,38 +295,40 @@
         }
       }
       document.addEventListener('mousemove', move)
-      document.addEventListener('mouseup', () => {
-        document.removeEventListener('mousemove', move)
-      }, { once: true })
+      document.addEventListener('mouseup',
+        () => document.removeEventListener('mousemove', move),
+        { once: true })
+    }
+    TouchList.prototype.itemByIdentifier = function (identifier) {
+      for (let i = 0; i < this.length; i++)
+        if (this[i].identifier === identifier)
+          return this[i]
+      return null
     }
     const pieceTouchstart = (klotski, name, ev) => {
       if (ev.targetTouches.length > 1) return
-      const target = ev.target
       const startTouch = ev.targetTouches[0]
-      const identifier = startTouch.identifier
+      const startIdentifier = startTouch.identifier
       let [startX, startY] = [startTouch.clientX, startTouch.clientY]
+      const [xMin, yMin] = [ev.target.offsetWidth, ev.target.offsetHeight]
+        .map((v) => v / 2)
       const move = (ev) => {
-        let touch
-        for (let i = 0; i < ev.touches.length; i++)
-          if (ev.touches[i].identifier === identifier) {
-            touch = ev.touches[i]
-            break
-          }
-        const [currentX, currentY] = [touch.clientX, touch.clientY]
-        const [xMin, yMin] = [target.clientWidth, target.clientHeight].map((v) => v / 2)
-        const [xDiff, yDiff] = [currentX - startX, currentY - startY].map((diff) => Math.abs(diff))
+        const { clientX: currentX, clientY: currentY } =
+          ev.touches.itemByIdentifier(startIdentifier)
+        const [xDiff, yDiff] = [currentX - startX, currentY - startY]
+          .map((diff) => Math.abs(diff))
         if (xDiff > xMin || yDiff > yMin) {
-          if (klotski.canMove(name, xDiff > yDiff ?
+          if (klotski.canMove(name, xDiff - xMin > yDiff - yMin ?
             (currentX > startX ? Orientation.right : Orientation.left) :
             (currentY > startY ? Orientation.down : Orientation.up))) {
-            klotski.move();[startX, startY] = [currentX, currentY]
+            klotski.move()
+              ;[startX, startY] = [currentX, currentY]
           }
         }
       }
       const end = (ev) => {
-        for (let i = 0; i < ev.touches.length; i++)
-          if (ev.touches[i].identifier === identifier)
-            return // 松开的不是这个手指
+        if (ev.touches.itemByIdentifier(startIdentifier) !== null)
+          return // 松开的不是这个手指
         document.removeEventListener('touchmove', move)
         document.removeEventListener('touchend', end)
         document.removeEventListener('touchcancel', end)
@@ -392,9 +395,9 @@
       digitalKlotskiContainer.innerHTML = ''
       digitalKlotski.drawOn(digitalKlotskiContainer, (name) => digitalPieceDictionary.item(name))
       digitalKlotskiContainer.style.height =
-        digitalKlotskiContainer.firstElementChild.clientHeight * n
+        digitalKlotskiContainer.firstElementChild.offsetHeight * n
       digitalKlotskiContainer.style.width =
-        digitalKlotskiContainer.firstElementChild.clientWidth * n
+        digitalKlotskiContainer.firstElementChild.offsetWidth * n
     }
     // 经典华容道
     let classicalKlotski = null
@@ -547,9 +550,9 @@
             pieceDiv.innerHTML = pieceDiv.getAttribute('name')
           })
         digitalKlotskiContainer.style.height =
-          digitalKlotskiContainer.firstElementChild.clientHeight * n
+          digitalKlotskiContainer.firstElementChild.offsetHeight * n
         digitalKlotskiContainer.style.width =
-          digitalKlotskiContainer.firstElementChild.clientWidth * n
+          digitalKlotskiContainer.firstElementChild.offsetWidth * n
         return
       }
       createImageBitmap(file)
@@ -586,9 +589,9 @@
             })
           imageBitmap.close()
           digitalKlotskiContainer.style.height =
-            digitalKlotskiContainer.firstElementChild.clientHeight * n
+            digitalKlotskiContainer.firstElementChild.offsetHeight * n
           digitalKlotskiContainer.style.width =
-            digitalKlotskiContainer.firstElementChild.clientWidth * n
+            digitalKlotskiContainer.firstElementChild.offsetWidth * n
         }, (reason) => {
           alert(`图片加载失败：${reason}`)
         })

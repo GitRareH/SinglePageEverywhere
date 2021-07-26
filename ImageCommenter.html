@@ -1,0 +1,190 @@
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style type="text/css">
+    /* body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+    } */
+
+    body>* {
+      position: fixed;
+    }
+
+    .ClickArea {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      border: 0.1em dashed;
+      border-radius: 3px;
+      padding: 0.5em;
+
+      user-select: none;
+    }
+
+    #CanvasStack {
+      position: absolute;
+      display: flex;
+    }
+
+    #CanvasStack>:not(:nth-child(1)) {
+      position: absolute;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="StartPage">
+    <div id="OpenImageArea" class="ClickArea" accept-file="image/*" style="padding: 2em;">
+      <div style="font-weight: bold;">打开图片</div>
+      <div style="font-size: x-small;">点击此处或将图片拖至此处</div>
+    </div>
+    <h3>介绍</h3>
+    <p>一个简单快速的图片批注器。</p>
+    <h3>使用说明</h3>
+    <ol>
+      <li>打开要批注的图片；</li>
+      <li>使用鼠标，按住左键画箭头，按住右键添加批注；</li>
+      <li>按回车键合并图层，得到批注后的图片；</li>
+    </ol>
+  </div>
+  <div id="CanvasStack" style="display: none;">
+    <canvas>no canvas!!!</canvas>
+  </div>
+
+  <script type="text/javascript">
+    'use strict'
+    // 为所有的定义了可接受文件类型的元素添加处理事件
+    // 当用户添加文件后会引发自定义事件 addfile
+    document.querySelectorAll('[accept-file]')
+      .forEach((element) => {
+        const inputAccept = element.getAttribute('accept-file')
+        if (inputAccept.indexOf(',') >= 0)
+          throw '暂不支持此写法'
+        const mimeTypeRegex = new RegExp(`^${inputAccept.replace('*', '.*')}$`) // 参考 input 的 accept 属性用法和 mime 类型定义
+        element.addEventListener('click', () => {
+          const input = document.createElement('input')
+          input.setAttribute('type', 'file')
+          input.setAttribute('accept', inputAccept)
+          input.addEventListener('change', (ev) => {
+            if (input.files.length > 0)
+              element.dispatchEvent(new CustomEvent('addfile', { detail: input.files }))
+          })
+          input.click()
+        })
+        element.addEventListener('dragover', (ev) => ev.preventDefault())
+        element.addEventListener('drop', (ev) => {
+          ev.preventDefault()
+          const files = ev.dataTransfer.files
+          for (const file of files) {
+            if (!mimeTypeRegex.test(file.type)) {
+              alert('文件类型错误')
+              return
+            }
+          }
+          if (files.length > 0)
+            element.dispatchEvent(new CustomEvent('addfile', { detail: files }))
+        })
+      })
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    const canvasStack = {
+      ui: document.querySelector('#CanvasStack'),
+      penStyle: {
+        color: 'red',
+        width: 5,
+        cap: 'round', // butt round square
+        join: 'miter', // bevel round miter
+        /**
+         * @param {CanvasRenderingContext2D} ctx
+         */
+        setContext: function (ctx) {
+          ctx.strokeStyle = this.color
+          ctx.fillStyle = this.color
+          ctx.lineWidth = this.width
+          ctx.lineCap = this.cap
+          ctx.lineJoin = this.join
+        },
+      },
+      curIndex: 0,
+      /**
+       * 获取当前画布
+       * @return {HTMLCanvasElement}
+       */
+      curCanvas: function () {
+        return this.ui.querySelector(`:nth-child(${this.curIndex + 1})`)
+      },
+      addCanvas: function () {
+        const canvas = document.createElement('canvas')
+        canvas.width = this.ui.clientWidth
+        canvas.height = this.ui.clientHeight
+        this.curIndex += 1
+        this.ui.insertBefore(canvas, this.curCanvas())
+        return canvas
+      },
+      /**
+       * 在当前画面中绘制图像
+       * @param {ImageBitmap} imageBitmap
+       */
+      drawImage: function (imageBitmap) {
+        const canvas = this.curCanvas()
+        canvas.width = imageBitmap.width
+        canvas.height = imageBitmap.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(imageBitmap, 0, 0)
+      },
+      drawArrow: function (from, to) {
+        const length = Math.sqrt((from.x - to.x) ** 2 + (from.y - to.y) ** 2)
+        const angle = Math.atan((to.y - from.y) / (to.x - from.x))
+        const tb = Math.tan(22.5 * Math.PI / 180)
+        const canvas = this.curCanvas()
+        const ctx = canvas.getContext('2d')
+        this.penStyle.setContext(ctx)
+        ctx.save()
+        //
+        ctx.translate(from.x, from.y)
+        ctx.rotate(angle)
+        //
+        ctx.moveTo(0, 0)
+        ctx.lineTo(length, 0)
+        ctx.stroke()
+        // 
+        ctx.beginPath()
+        ctx.moveTo(length, 0)
+        ctx.lineTo(length - ctx.lineWidth / tb, -ctx.lineWidth)
+        ctx.lineTo(length - ctx.lineWidth / tb, ctx.lineWidth)
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+        ctx.restore()
+      },
+      drawTextRect: function (from, to, text) {
+        const matches = text.matchAll(/\n/g)
+        const canvas = this.curCanvas()
+        const ctx = canvas.getContext('2d')
+        this.penStyle.setContext(ctx)
+      },
+    }
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    document.querySelector('#OpenImageArea')
+      .addEventListener('addfile', (ev) => {
+        const imageFile = ev.detail[0]
+        createImageBitmap(imageFile)
+          .then((imageBitmap) => {
+            canvasStack.drawImage(imageBitmap)
+            imageBitmap.close()
+          })
+        document.querySelector('#StartPage').style.display = 'none'
+        canvasStack.ui.style.removeProperty('display')
+      })
+  </script>
+</body>
+
+</html>

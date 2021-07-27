@@ -97,9 +97,10 @@
       ui: document.querySelector('#CanvasStack'),
       penStyle: {
         color: 'red',
-        width: 5,
+        width: 3,
         cap: 'round', // butt round square
         join: 'miter', // bevel round miter
+        font: window.getComputedStyle(document.body).font,
         /**
          * @param {CanvasRenderingContext2D} ctx
          */
@@ -109,6 +110,7 @@
           ctx.lineWidth = this.width
           ctx.lineCap = this.cap
           ctx.lineJoin = this.join
+          ctx.font = this.font
         },
       },
       curIndex: 0,
@@ -131,7 +133,7 @@
        * 在当前画面中绘制图像
        * @param {ImageBitmap} imageBitmap
        */
-      drawImage: function (imageBitmap) {
+      drawBackgroundImage: function (imageBitmap) {
         const canvas = this.curCanvas()
         canvas.width = imageBitmap.width
         canvas.height = imageBitmap.height
@@ -141,19 +143,19 @@
       drawArrow: function (from, to) {
         const length = Math.sqrt((from.x - to.x) ** 2 + (from.y - to.y) ** 2)
         const angle = Math.atan((to.y - from.y) / (to.x - from.x))
-        const tb = Math.tan(22.5 * Math.PI / 180)
+        const tb = Math.tan(45 / 2 * Math.PI / 180) // 箭头角度计算
         const canvas = this.curCanvas()
         const ctx = canvas.getContext('2d')
         this.penStyle.setContext(ctx)
         ctx.save()
-        //
+        // 先平移再旋转才能到达箭头起点
         ctx.translate(from.x, from.y)
         ctx.rotate(angle)
-        //
+        // 向 x 轴正方向画箭头
         ctx.moveTo(0, 0)
         ctx.lineTo(length, 0)
         ctx.stroke()
-        // 
+        // 画箭头三角形
         ctx.beginPath()
         ctx.moveTo(length, 0)
         ctx.lineTo(length - ctx.lineWidth / tb, -ctx.lineWidth)
@@ -164,10 +166,28 @@
         ctx.restore()
       },
       drawTextRect: function (from, to, text) {
-        const matches = text.matchAll(/\n/g)
         const canvas = this.curCanvas()
         const ctx = canvas.getContext('2d')
         this.penStyle.setContext(ctx)
+        ctx.textBaseline = 'top' // 便于使用 actualBoundingBoxDescent 计算文字区域高度
+        const textMetrics = ctx.measureText(text)
+        const newLength = (f, t, x) => (f > t ? f - x : f + x)
+        // 文字区域
+        const rawMetrics = {
+          x: Math.min(from.x, newLength(from.x, to.x, textMetrics.width)),
+          y: Math.min(from.y, newLength(from.y, to.y, textMetrics.actualBoundingBoxDescent)),
+          w: textMetrics.width,
+          h: textMetrics.actualBoundingBoxDescent,
+        }
+        if (rawMetrics.w <= 0 || rawMetrics.h <= 0) return
+        ctx.save()
+        // 因为要画边框，所以画布整体平移，留出边框边缘的空间
+        ctx.translate(from.x < to.x ? ctx.lineWidth : -ctx.lineWidth,
+          from.y < to.y ? ctx.lineWidth : -ctx.lineWidth)
+        ctx.fillText(text, rawMetrics.x, rawMetrics.y)
+        ctx.strokeRect(rawMetrics.x - ctx.lineWidth, rawMetrics.y - ctx.lineWidth,
+          rawMetrics.w + ctx.lineWidth * 2, rawMetrics.h + ctx.lineWidth * 2)
+        ctx.restore()
       },
     }
   </script>
@@ -178,7 +198,7 @@
         const imageFile = ev.detail[0]
         createImageBitmap(imageFile)
           .then((imageBitmap) => {
-            canvasStack.drawImage(imageBitmap)
+            canvasStack.drawBackgroundImage(imageBitmap)
             imageBitmap.close()
           })
         document.querySelector('#StartPage').style.display = 'none'

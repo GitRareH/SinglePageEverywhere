@@ -53,6 +53,10 @@
     div.ModalDialogContainer>* {
       margin-top: 1em;
     }
+
+    li>span {
+      font-size: smaller;
+    }
   </style>
 </head>
 
@@ -67,8 +71,11 @@
     <h3>使用说明</h3>
     <ol>
       <li>打开要批注的图片；</li>
-      <li>使用鼠标，按住左键画箭头，按住右键添加批注；</li>
-      <li>按回车键合并图层，得到批注后的图片；</li>
+      <li>使用鼠标，按住左键画箭头，按住右键添加批注；
+        <br><span>文字批注：边框会自动向起始点收缩/向终点扩张</span>
+        <br><span>图片批注：保持图片比例缩放至边框大小</span>
+      </li>
+      <li>按回车键保存批注后的图片；</li>
     </ol>
   </div>
   <div id="CanvasStack" style="display: none;">
@@ -76,9 +83,7 @@
   </div>
   <div id="InputDialog" class="ModalDialogContainer" style="display: none;">
     <textarea id="InputTextArea" cols="30" rows="10"></textarea>
-    <button class="ClickArea">
-      <div style="font-weight: bold;">确认</div>
-    </button>
+    <button class="ClickArea">确认</button>
   </div>
 
   <script type="text/javascript">
@@ -189,6 +194,7 @@
         ctx.translate(from.x, from.y)
         ctx.rotate(angle)
         // 向 x 轴正方向画箭头
+        ctx.beginPath()
         ctx.moveTo(0, 0)
         ctx.lineTo(length, 0)
         ctx.stroke()
@@ -218,34 +224,53 @@
         this.penStyle.setContext(ctx)
         // 便于使用 actualBoundingBoxDescent 计算文字区域高度
         ctx.textBaseline = 'top'
-        const lineX = Math.min(from.x, to.x) + ctx.lineWidth
-        let lineY = Math.min(from.y, to.y) + ctx.lineWidth
-        for (const [line] of /^.*$/gm[Symbol.matchAll](text)) {
-          ctx.fillText(line, lineX, lineY)
-          const textMetrics = ctx.measureText(line)
-          lineY += textMetrics.actualBoundingBoxDescent
+        const lineInfos = Array.from(/^.*$/gm[Symbol.matchAll](text),
+          ([s]) => ({ line: s, textMetrics: ctx.measureText(s) }))
+        const { w, h } = lineInfos.reduce((pre, lineInfo) => {
+          pre.w = Math.max(pre.w, lineInfo.textMetrics.width)
+          pre.h += lineInfo.textMetrics.actualBoundingBoxDescent
+          return pre
+        }, { w: 0, h: 0 })
+        const lineX = from.x < to.x ? from.x + ctx.lineWidth :
+          from.x - w - ctx.lineWidth
+        const lineY = from.y < to.y ? from.y + ctx.lineWidth :
+          from.y - h - ctx.lineWidth
+        let curLineY = lineY
+        for (const { line, textMetrics } of lineInfos) {
+          ctx.fillText(line, lineX, curLineY)
+          curLineY += textMetrics.actualBoundingBoxDescent
         }
+        const rect = {
+          x: lineX - ctx.lineWidth,
+          y: lineY - ctx.lineWidth,
+          w: w + ctx.lineWidth * 2,
+          h: h + ctx.lineWidth * 2
+        }
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
+      },
+      drawImageRect: function (from, to, imageBitmap) {
       },
     }
     canvasStack.ui.addEventListener('contextmenu', e => e.preventDefault())
     canvasStack.ui.addEventListener('mousedown', (ev) => {
       let moveListener = null
-      const [startX, startY] = [ev.pageX, ev.pageY]
+      const from = { x: ev.pageX, y: ev.pageY }
+      let to = { x: ev.pageX, y: ev.pageY }
       switch (ev.button) {
         case 0:// left
           moveListener = (ev) => {
-            const [currentX, currentY] = [ev.pageX, ev.pageY]
+            to.x = ev.pageX
+            to.y = ev.pageY
             canvasStack.clearAll()
-            canvasStack.drawArrow({ x: startX, y: startY },
-              { x: currentX, y: currentY })
+            canvasStack.drawArrow(from, to)
           }
           break
         case 2: // right
           moveListener = (ev) => {
-            const [currentX, currentY] = [ev.pageX, ev.pageY]
+            to.x = ev.pageX
+            to.y = ev.pageY
             canvasStack.clearAll()
-            canvasStack.drawRect({ x: startX, y: startY },
-              { x: currentX, y: currentY })
+            canvasStack.drawRect(from, to)
           }
           break
         default: return
@@ -257,17 +282,11 @@
       document.addEventListener('mouseup', () => {
         document.removeEventListener('mousemove', moveListener)
         if (ev.button === 2) {
-          canvasStack.drawTextRect()
+          canvasStack.clearAll()
+          canvasStack.drawTextRect(from, to, "测试\n大小大小")
         }
       }, { once: true })
     })
-    function inputText() {
-
-      document.querySelector('#InputDialog').style.removeProperty('display')
-      document.querySelector('#InputTextArea').focus()
-      document.querySelector('#InputDialog').style.display = 'none'
-      canvasStack.drawTextRect()
-    }
   </script>
   <script type="text/javascript">
     'use strict'

@@ -45,13 +45,8 @@
       right: 0;
       background-color: rgba(117, 117, 117, 0.5);
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-    }
-
-    div.ModalDialogContainer>* {
-      margin-top: 1em;
     }
 
     li>span {
@@ -88,8 +83,9 @@
 
   <script type="text/javascript">
     'use strict'
-    // 为所有的定义了可接受文件类型的元素添加处理事件
-    // 当用户添加文件后会引发自定义事件 addfile
+    // 为所有的定义了 accept-file 属性的元素添加处理事件
+    // 当用户添加文件后会引发自定义事件 addfile 事件
+    // 事件的 detail 字段是一个 FileList 对象
     document.querySelectorAll('[accept-file]')
       .forEach((element) => {
         const inputAccept = element.getAttribute('accept-file')
@@ -120,6 +116,36 @@
             element.dispatchEvent(new CustomEvent('addfile', { detail: files }))
         })
       })
+  </script>
+  <script type="text/javascript">
+    'use strict'
+    //
+    const commentDialog = {
+      ui: document.querySelector('#InputDialog'),
+      textarea: document.querySelector('#InputTextArea'),
+      init: function () {
+        this.ui.addEventListener('keydown', (ev) => {
+          if (ev.defaultPrevented) return
+          console.log('commentDialog esc')
+          if (ev.key === 'Escape' || ev.key === 'Esc') this.close('cancel')
+        })
+        this.init = null
+      },
+      exec: {},
+      show: function () {
+        this.ui.style.removeProperty('display')
+        this.textarea.focus()
+        return new Promise((resolve, reject) => {
+          this.exec.ok = resolve
+          this.exec.cancel = reject
+        })
+      },
+      close: function (action, ...actionArgs) {
+        this.ui.style.display = 'none'
+        this.exec[action](...actionArgs)
+      },
+    }
+    commentDialog.init()
   </script>
   <script type="text/javascript">
     'use strict'
@@ -249,14 +275,18 @@
         ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
       },
       drawImageRect: function (from, to, imageBitmap) {
+        console.error('todo')
       },
     }
-    canvasStack.ui.addEventListener('contextmenu', e => e.preventDefault())
+    canvasStack.ui.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault()
+    })
     canvasStack.ui.addEventListener('mousedown', (ev) => {
       let moveListener = null
       const from = { x: ev.pageX, y: ev.pageY }
       let to = { x: ev.pageX, y: ev.pageY }
-      switch (ev.button) {
+      const button = ev.button
+      switch (button) {
         case 0:// left
           moveListener = (ev) => {
             to.x = ev.pageX
@@ -275,16 +305,36 @@
           break
         default: return
       }
-      document.addEventListener('mousemove', () => {
+      const moveInitialize = () => {
         canvasStack.addCanvas()
-      }, { once: true })
+        canvasStack.ui.addEventListener('contextmenu', () => {
+          if (button === 2) {
+            commentDialog.show().then((comment) => {
+              canvasStack.clearAll()
+              if (typeof comment === 'string') {
+                canvasStack.drawTextRect(from, to, comment)
+              } else if (comment instanceof Blob) {
+                createImageBitmap(comment).then((imageBitmap) => {
+                  canvasStack.drawImageRect(from, to, imageBitmap)
+                  imageBitmap.close()
+                }, () => {
+                  canvasStack.removeCanvas()
+                })
+              } else {
+                canvasStack.removeCanvas()
+              }
+            }, () => {
+              canvasStack.removeCanvas()
+            })
+          }
+        }, { once: true })
+      }
+      document.addEventListener('mousemove', moveInitialize,
+        { once: true })
       document.addEventListener('mousemove', moveListener)
       document.addEventListener('mouseup', () => {
+        document.removeEventListener('mousemove', moveInitialize)
         document.removeEventListener('mousemove', moveListener)
-        if (ev.button === 2) {
-          canvasStack.clearAll()
-          canvasStack.drawTextRect(from, to, "测试\n大小大小")
-        }
       }, { once: true })
     })
   </script>

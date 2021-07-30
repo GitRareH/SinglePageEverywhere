@@ -3,27 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <style type="text/css">
-    /* body {
-      display: flex;
-      align-items: stretch;
-      justify-content: stretch;
-    }
-
-    body>* {
-      position: fixed;
-    } */
-
     .ClickArea {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-
-      border: 0.1em dashed;
       border-radius: 3px;
       padding: 0.5em;
-
       user-select: none;
+    }
+
+    .ClickArea[accept-file] {
+      border: 0.1em dashed;
     }
 
     #CanvasStack {
@@ -43,23 +34,36 @@
       left: 0;
       bottom: 0;
       right: 0;
-      background-color: rgba(117, 117, 117, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background-color: rgba(255, 255, 255, 0.5);
+    }
+
+    #InputDialog {
+      display: grid;
+      gap: 1em 1em;
+      grid-template-rows: 1fr min-content 5em 1fr;
+      grid-template-columns: 1fr 10em 10em 1fr;
+      grid-template-areas:
+        ". . . ."
+        ". h h ."
+        ". l r ."
+        ". . . .";
     }
 
     li>span {
       font-size: smaller;
+    }
+
+    label {
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
   <div id="StartPage">
-    <div id="OpenImageArea" class="ClickArea" accept-file="image/*" style="padding: 2em;">
-      <div style="font-weight: bold;">打开图片</div>
-      <div style="font-size: x-small;">点击此处或将图片拖至此处</div>
+    <div id="OpenImageArea" class="ClickArea" accept-file="image/*" style="width: 20em; padding: 2em;">
+      <label>打开图片</label>
+      <div style="font-size: x-small;">点击此处或将图片文件拖至此处</div>
     </div>
     <h3>介绍</h3>
     <p>一个简单快速的图片批注器。</p>
@@ -72,13 +76,18 @@
       </li>
       <li>按回车键保存批注后的图片；</li>
     </ol>
+    <h4>高级用法</h4>
+    <p>控制台通过 canvasStack.penStyle 的属性调整下次绘制的样式</p>
   </div>
   <div id="CanvasStack" style="display: none;">
     <canvas>no canvas!!!</canvas>
   </div>
   <div id="InputDialog" class="ModalDialogContainer" style="display: none;">
-    <textarea id="InputTextArea" cols="30" rows="10"></textarea>
-    <button class="ClickArea">确认</button>
+    <div style="grid-area: h; justify-self: center;">Esc 取消此次批注</div>
+    <textarea style="grid-area: l;" name="Text" placeholder="Ctrl+Enter 提交"></textarea>
+    <div style="grid-area: r;" name="Image" class="ClickArea" accept-file="image/*">
+      <label>添加图片批注</label>
+    </div>
   </div>
 
   <script type="text/javascript">
@@ -122,27 +131,32 @@
     //
     const commentDialog = {
       ui: document.querySelector('#InputDialog'),
-      textarea: document.querySelector('#InputTextArea'),
+      textInput: document.querySelector('#InputDialog>textarea'),
+      imageInput: document.querySelector('#InputDialog>[accept-file]'),
       init: function () {
         this.ui.addEventListener('keydown', (ev) => {
-          if (ev.defaultPrevented) return
-          console.log('commentDialog esc')
           if (ev.key === 'Escape' || ev.key === 'Esc') this.close('cancel')
+        })
+        this.textInput.addEventListener('keydown', (ev) => {
+          if (ev.ctrlKey && ev.key === 'Enter') this.close('ok', this.textInput.value)
+        })
+        this.imageInput.addEventListener('addfile', (ev) => {
+          if (ev.detail.length > 0) this.close('ok', ev.detail[0])
         })
         this.init = null
       },
-      exec: {},
+      closeAction: {},
       show: function () {
         this.ui.style.removeProperty('display')
-        this.textarea.focus()
+        this.textInput.focus()
         return new Promise((resolve, reject) => {
-          this.exec.ok = resolve
-          this.exec.cancel = reject
+          this.closeAction.ok = resolve
+          this.closeAction.cancel = reject
         })
       },
       close: function (action, ...actionArgs) {
         this.ui.style.display = 'none'
-        this.exec[action](...actionArgs)
+        this.closeAction[action](...actionArgs)
       },
     }
     commentDialog.init()
@@ -191,7 +205,10 @@
           this.curIndex -= 1
         }
       },
-      clearAll: function () {
+      joinCanvas: function () {
+
+      },
+      clearRect: function () {
         const canvas = this.curCanvas()
         const ctx = canvas.getContext('2d')
         ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -278,65 +295,78 @@
         console.error('todo')
       },
     }
-    canvasStack.ui.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault()
-    })
-    canvasStack.ui.addEventListener('mousedown', (ev) => {
-      let moveListener = null
-      const from = { x: ev.pageX, y: ev.pageY }
-      let to = { x: ev.pageX, y: ev.pageY }
-      const button = ev.button
-      switch (button) {
-        case 0:// left
-          moveListener = (ev) => {
-            to.x = ev.pageX
-            to.y = ev.pageY
-            canvasStack.clearAll()
-            canvasStack.drawArrow(from, to)
-          }
-          break
-        case 2: // right
-          moveListener = (ev) => {
-            to.x = ev.pageX
-            to.y = ev.pageY
-            canvasStack.clearAll()
-            canvasStack.drawRect(from, to)
-          }
-          break
-        default: return
-      }
-      const moveInitialize = () => {
-        canvasStack.addCanvas()
-        canvasStack.ui.addEventListener('contextmenu', () => {
-          if (button === 2) {
-            commentDialog.show().then((comment) => {
-              canvasStack.clearAll()
-              if (typeof comment === 'string') {
-                canvasStack.drawTextRect(from, to, comment)
-              } else if (comment instanceof Blob) {
-                createImageBitmap(comment).then((imageBitmap) => {
-                  canvasStack.drawImageRect(from, to, imageBitmap)
-                  imageBitmap.close()
+    {
+      let drawing = null
+      canvasStack.ui.addEventListener('contextmenu', (ev) => { ev.preventDefault() })
+      canvasStack.ui.addEventListener('mousedown', (ev) => {
+        if (drawing !== null) return
+        const button = ev.button
+        if (button !== 0 && button !== 2) return
+        const from = { x: ev.pageX, y: ev.pageY }
+        const to = { x: ev.pageX, y: ev.pageY }
+        switch (button) {
+          case 0: { // left
+            const drawStart = () => { canvasStack.addCanvas() }
+            drawing = (ev) => {
+              to.x = ev.pageX
+              to.y = ev.pageY
+              canvasStack.clearRect()
+              canvasStack.drawArrow(from, to)
+            }
+            const drawEnd = (ev) => {
+              if (ev.button === button) {
+                document.removeEventListener('mousemove', drawStart)
+                document.removeEventListener('mousemove', drawing)
+                document.removeEventListener('mouseup', drawEnd)
+                drawing = null
+                if (from.x === to.x && from.y === to.y)
+                  canvasStack.removeCanvas()
+              }
+            }
+            document.addEventListener('mousemove', drawStart, { once: true })
+            document.addEventListener('mousemove', drawing)
+            document.addEventListener('mouseup', drawEnd)
+          } break
+          case 2: { // right
+            const drawStart = () => { canvasStack.addCanvas() }
+            drawing = (ev) => {
+              to.x = ev.pageX
+              to.y = ev.pageY
+              canvasStack.clearRect()
+              canvasStack.drawRect(from, to)
+            }
+            const drawEnd = () => {
+              document.removeEventListener('mousemove', drawStart)
+              document.removeEventListener('mousemove', drawing)
+              drawing = null
+              if (from.x === to.x && from.y === to.y)
+                canvasStack.removeCanvas()
+              else
+                commentDialog.show().then((comment) => {
+                  canvasStack.clearRect()
+                  if (typeof comment === 'string') {
+                    canvasStack.drawTextRect(from, to, comment)
+                  } else if (comment instanceof Blob) {
+                    createImageBitmap(comment).then((imageBitmap) => {
+                      canvasStack.drawImageRect(from, to, imageBitmap)
+                      imageBitmap.close()
+                    }, () => {
+                      canvasStack.removeCanvas()
+                    })
+                  } else {
+                    canvasStack.removeCanvas()
+                  }
                 }, () => {
                   canvasStack.removeCanvas()
                 })
-              } else {
-                canvasStack.removeCanvas()
-              }
-            }, () => {
-              canvasStack.removeCanvas()
-            })
-          }
-        }, { once: true })
-      }
-      document.addEventListener('mousemove', moveInitialize,
-        { once: true })
-      document.addEventListener('mousemove', moveListener)
-      document.addEventListener('mouseup', () => {
-        document.removeEventListener('mousemove', moveInitialize)
-        document.removeEventListener('mousemove', moveListener)
-      }, { once: true })
-    })
+            }
+            document.addEventListener('mousemove', drawStart, { once: true })
+            document.addEventListener('mousemove', drawing)
+            document.addEventListener('contextmenu', drawEnd, { once: true })
+          } break
+        }
+      })
+    }
   </script>
   <script type="text/javascript">
     'use strict'

@@ -74,12 +74,12 @@
         <br><span>文字批注：边框会自动向起始点收缩/向终点扩张</span>
         <br><span>图片批注：保持图片比例缩放至边框大小</span>
       </li>
-      <li>按回车键保存批注后的图片；</li>
+      <li>保存（Ctrl+S）/复制（Ctrl+C）批注后的图片；</li>
     </ol>
-    <h4>高级用法</h4>
+    <h3>高级用法</h3>
     <p>控制台通过 canvasStack.penStyle 的属性调整下次绘制的样式</p>
   </div>
-  <div id="CanvasStack" style="display: none;">
+  <div id="CanvasStack" style="display: none;" tabindex="0">
     <canvas>no canvas!!!</canvas>
   </div>
   <div id="InputDialog" class="ModalDialogContainer" style="display: none;">
@@ -147,6 +147,7 @@
       },
       closeAction: {},
       show: function () {
+        this.originalActiveElement = document.activeElement
         this.ui.style.removeProperty('display')
         this.textInput.focus()
         return new Promise((resolve, reject) => {
@@ -156,6 +157,7 @@
       },
       close: function (action, ...actionArgs) {
         this.ui.style.display = 'none'
+        this.originalActiveElement.focus()
         this.closeAction[action](...actionArgs)
       },
     }
@@ -188,28 +190,35 @@
        * 获取当前画布
        * @return {HTMLCanvasElement}
        */
-      curCanvas: function () {
+      current: function () {
         return this.ui.querySelector(`:nth-child(${this.curIndex + 1})`)
       },
-      addCanvas: function () {
+      add: function () {
         const canvas = document.createElement('canvas')
         canvas.width = this.ui.clientWidth
         canvas.height = this.ui.clientHeight
         this.curIndex += 1
-        this.ui.insertBefore(canvas, this.curCanvas())
+        this.ui.insertBefore(canvas, this.current())
         return canvas
       },
-      removeCanvas: function () {
+      remove: function () {
         if (this.curIndex > 0) {
-          this.curCanvas().remove()
+          this.current().remove()
           this.curIndex -= 1
         }
       },
-      joinCanvas: function () {
-
+      join: function () {
+        const canvasList = Array.from(this.ui.children)
+        const dstCtx = canvasList[0].getContext('2d')
+        for (let i = 1; i < canvasList.length; i++) {
+          const srcCanvas = canvasList[i]
+          dstCtx.drawImage(srcCanvas, 0, 0)
+          srcCanvas.remove()
+        }
+        this.curIndex = 0
       },
       clearRect: function () {
-        const canvas = this.curCanvas()
+        const canvas = this.current()
         const ctx = canvas.getContext('2d')
         ctx.clearRect(0, 0, canvas.width, canvas.height)
       },
@@ -218,7 +227,7 @@
        * @param {ImageBitmap} imageBitmap
        */
       drawBackgroundImage: function (imageBitmap) {
-        const canvas = this.curCanvas()
+        const canvas = this.current()
         canvas.width = imageBitmap.width
         canvas.height = imageBitmap.height
         const ctx = canvas.getContext('2d')
@@ -229,8 +238,7 @@
         const angle = (from.x < to.x ? 0 : Math.PI) +
           (from.x !== to.x ? Math.atan((to.y - from.y) / (to.x - from.x)) : from.y < to.y ? -Math.PI / 2 : Math.PI / 2)
         const tb = Math.tan(45 / 2 * Math.PI / 180) // 箭头角度计算
-        const canvas = this.curCanvas()
-        const ctx = canvas.getContext('2d')
+        const ctx = this.current().getContext('2d')
         this.penStyle.setContext(ctx)
         ctx.save()
         // 先平移再旋转才能到达箭头起点
@@ -258,12 +266,12 @@
           w: Math.abs(to.x - from.x),
           h: Math.abs(to.y - from.y),
         }
-        const ctx = this.curCanvas().getContext('2d')
+        const ctx = this.current().getContext('2d')
         this.penStyle.setContext(ctx)
         ctx.strokeRect(x, y, w, h)
       },
       drawTextRect: function (from, to, text) {
-        const ctx = this.curCanvas().getContext('2d')
+        const ctx = this.current().getContext('2d')
         this.penStyle.setContext(ctx)
         // 便于使用 actualBoundingBoxDescent 计算文字区域高度
         ctx.textBaseline = 'top'
@@ -274,29 +282,49 @@
           pre.h += lineInfo.textMetrics.actualBoundingBoxDescent
           return pre
         }, { w: 0, h: 0 })
-        const lineX = from.x < to.x ? from.x + ctx.lineWidth :
-          from.x - w - ctx.lineWidth
-        const lineY = from.y < to.y ? from.y + ctx.lineWidth :
-          from.y - h - ctx.lineWidth
-        let curLineY = lineY
+        const padding = ctx.lineWidth * 1.5
+        const x = from.x < to.x ? from.x + ctx.lineWidth : from.x - w - ctx.lineWidth
+        const y = from.y < to.y ? from.y + ctx.lineWidth : from.y - h - ctx.lineWidth
+        let curLineY = y
         for (const { line, textMetrics } of lineInfos) {
-          ctx.fillText(line, lineX, curLineY)
+          ctx.fillText(line, x, curLineY)
           curLineY += textMetrics.actualBoundingBoxDescent
         }
         const rect = {
-          x: lineX - ctx.lineWidth,
-          y: lineY - ctx.lineWidth,
-          w: w + ctx.lineWidth * 2,
-          h: h + ctx.lineWidth * 2
+          x: x - padding,
+          y: y - padding,
+          w: w + padding * 2,
+          h: h + padding * 2
         }
         ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
       },
+      /**
+       * 在当前画面中绘制图像
+       * @param {ImageBitmap} imageBitmap
+       */
       drawImageRect: function (from, to, imageBitmap) {
-        console.error('todo')
+        const ctx = this.current().getContext('2d')
+        this.penStyle.setContext(ctx)
+        const scale = Math.min(
+          Math.abs(from.x - to.x) / imageBitmap.width,
+          Math.abs(from.y - to.y) / imageBitmap.height)
+        const [w, h] = [imageBitmap.width, imageBitmap.height]
+          .map(v => Math.floor(v * scale))
+        const padding = ctx.lineWidth / 2
+        const x = from.x < to.x ? from.x + padding : from.x - w - padding
+        const y = from.y < to.y ? from.y + padding : from.y - h - padding
+        ctx.drawImage(imageBitmap, x, y, w, h)
+        const rect = {
+          x: x - padding,
+          y: y - padding,
+          w: w + padding * 2,
+          h: h + padding * 2
+        }
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
       },
     }
     {
-      let drawing = null
+      let drawing = null // 同时用作画笔正在绘制的标志
       canvasStack.ui.addEventListener('contextmenu', (ev) => { ev.preventDefault() })
       canvasStack.ui.addEventListener('mousedown', (ev) => {
         if (drawing !== null) return
@@ -306,7 +334,9 @@
         const to = { x: ev.pageX, y: ev.pageY }
         switch (button) {
           case 0: { // left
-            const drawStart = () => { canvasStack.addCanvas() }
+            const drawStart = () => {
+              canvasStack.add()
+            }
             drawing = (ev) => {
               to.x = ev.pageX
               to.y = ev.pageY
@@ -319,8 +349,6 @@
                 document.removeEventListener('mousemove', drawing)
                 document.removeEventListener('mouseup', drawEnd)
                 drawing = null
-                if (from.x === to.x && from.y === to.y)
-                  canvasStack.removeCanvas()
               }
             }
             document.addEventListener('mousemove', drawStart, { once: true })
@@ -328,7 +356,11 @@
             document.addEventListener('mouseup', drawEnd)
           } break
           case 2: { // right
-            const drawStart = () => { canvasStack.addCanvas() }
+            let start = false
+            const drawStart = () => {
+              start = true
+              canvasStack.add()
+            }
             drawing = (ev) => {
               to.x = ev.pageX
               to.y = ev.pageY
@@ -339,9 +371,7 @@
               document.removeEventListener('mousemove', drawStart)
               document.removeEventListener('mousemove', drawing)
               drawing = null
-              if (from.x === to.x && from.y === to.y)
-                canvasStack.removeCanvas()
-              else
+              if (start)
                 commentDialog.show().then((comment) => {
                   canvasStack.clearRect()
                   if (typeof comment === 'string') {
@@ -351,37 +381,79 @@
                       canvasStack.drawImageRect(from, to, imageBitmap)
                       imageBitmap.close()
                     }, () => {
-                      canvasStack.removeCanvas()
+                      canvasStack.remove()
                     })
                   } else {
-                    canvasStack.removeCanvas()
+                    canvasStack.remove()
                   }
                 }, () => {
-                  canvasStack.removeCanvas()
+                  canvasStack.remove()
                 })
             }
             document.addEventListener('mousemove', drawStart, { once: true })
             document.addEventListener('mousemove', drawing)
+            // 使用 mouseup 则之后会在其他元素上触发 contextmenu 事件
             document.addEventListener('contextmenu', drawEnd, { once: true })
           } break
+          default: break
+        }
+      })
+      canvasStack.ui.addEventListener('keydown', (ev) => {
+        switch (ev.key) {
+          case 's': {
+            // 合并图层并保存
+            if (!ev.ctrlKey) return
+            ev.preventDefault()
+            canvasStack.join()
+            const a = document.createElement('a')
+            a.download = canvasStack.filename + '_comment.png'
+            a.href = canvasStack.current().toDataURL()
+            a.click()
+          } break
+          case 'c': {
+            // 合并图层并复制
+            if (!ev.ctrlKey) return
+            ev.preventDefault()
+            canvasStack.join()
+            canvasStack.current().toBlob((blob) => {
+              navigator.permissions.query({ name: 'clipboard-write' })
+                .then((permissionStatus) => {
+                  if (permissionStatus.state !== 'granted') return
+                  navigator.clipboard.write([
+                    new ClipboardItem({ ['image/png']: blob })
+                  ]).then(
+                    () => { alert('已将图片复制到剪贴板') },
+                    (e) => { alert('无法复制到剪贴板'); console.log(e) }
+                  )
+                })
+            })
+          } break
+          case 'z': {
+            // 撤销
+            if (!ev.ctrlKey) return
+            ev.preventDefault()
+            canvasStack.remove()
+          } break
+          default: break
         }
       })
     }
   </script>
   <script type="text/javascript">
     'use strict'
-    // 打开图片
+    // 打开背景图片
     document.querySelector('#OpenImageArea')
       .addEventListener('addfile', (ev) => {
         const imageFile = ev.detail[0]
         createImageBitmap(imageFile)
           .then((imageBitmap) => {
+            canvasStack.filename = imageFile.name
             canvasStack.drawBackgroundImage(imageBitmap)
             imageBitmap.close()
           })
         document.querySelector('#StartPage').style.display = 'none'
         canvasStack.ui.style.removeProperty('display')
-        canvasStack.ui.autofocus = true
+        canvasStack.ui.focus()
       })
   </script>
 </body>
